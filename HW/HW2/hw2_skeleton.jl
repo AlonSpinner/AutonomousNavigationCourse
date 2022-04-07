@@ -6,11 +6,9 @@ using Plots
 using StatsPlots
 using Parameters
 
-STATE_SIZE = 2
-
 @with_kw mutable struct POMDPscenario
-    F::Array{Float64, 2}   
-    H::Matrix{Float64, 2}
+    F::Array{Float64, 2}
+    H::Array{Float64, 2}   
     Σw::Array{Float64, 2}
     Σv::Array{Float64, 2}
     rng::MersenneTwister
@@ -21,46 +19,40 @@ end
 
 
 function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1})::FullNormal
-    
     μb, Σb = b.μ, b.Σ
     F  = 𝒫.F
     Σw, Σv = 𝒫.Σw, 𝒫.Σv
-    
     # predict
-    μp = F * μb  + a
-    Σp = F * Σb * F' + Σw
+    μp = # add your code here 
+    Σp = # add your code here 
     return MvNormal(μp, Σp)
 end 
 
 
 
 function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, o::Array{Float64, 1})::FullNormal
-    # kalman filter litrature from probobalistic robotics
     μb, Σb = b.μ, b.Σ
     F  = 𝒫.F
-    H  = 𝒫.H
     Σw, Σv = 𝒫.Σw, 𝒫.Σv
-    
-    # kalman predict
-    μp = F * μb  + a
-    Σp = F * Σb * F' + Σw
+    # predict
+    μp = # add your code here
+    Σp = # add your code here
     # update
-    K = Σp * H' * inv(H*Σp*H'+Σv)
-    μb′ = μp + K*(o-H*μp) 
-    Σb′ = (I(STATE_SIZE) - K*H)*Σp
+    #=  add your code here
+    μb′ = 
+    Σb′ = 
+    =#
     return MvNormal(μb′, Σb′)
 end    
 
 function SampleMotionModel(𝒫::POMDPscenario, a::Array{Float64, 1}, x::Array{Float64, 1})
-    noise = rand(𝒫.rng(),MvNormal([0;0],𝒫.Σw))
-    x' = 𝒫.F * x + a + noise
-    return x'
+    #=  add your code here
+    =#
 end 
 
 function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1})
-    noise = rand(𝒫.rng(),MvNormal([0;0],𝒫.Σv))
-    x' = 𝒫.H * x + noise
-    return x'
+      #=  add your code here
+      =#
 end   
 
 
@@ -87,6 +79,7 @@ function main()
     # set beacons locations 
     beacons =  # define array with beacons
     𝒫 = POMDPscenario(F=[1.0 0.0; 0.0 1.0],
+                      H=[1.0 0.0; 0.0 1.0],
                       Σw=0.1^2*[1.0 0.0; 0.0 1.0],
                       Σv=0.01^2*[1.0 0.0; 0.0 1.0], 
                       rng = rng , beacons=beacons, d=d, rmin=rmin) 
@@ -133,7 +126,9 @@ function main()
         covellipse!(τb[i].μ, τb[i].Σ, showaxes=true, n_std=3, label="step $i")
     end
     savefig(tr,"tr.pdf")
-           
+
+    
+               
     xgt0 = [-0.5, -0.2]           
     ak = [0.1, 0.1]           
 
