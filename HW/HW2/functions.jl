@@ -78,9 +78,11 @@ function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1
     return nothing    
 end
 
-function OrderBeacons(x,y)::Matrix{Float64}
+function OrderBeacons(x,y)::Array{Float64, 2}
     X = x' .* ones(3)
     Y  = ones(3)' .* y
-    return hcat(X[:],Y[:])
+    beacons = hcat(X[:],Y[:])
+    beacons = [r[:] for r in eachrow(beacons)]
+    return beacons
 end
 

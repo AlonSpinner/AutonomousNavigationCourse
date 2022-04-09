@@ -35,7 +35,7 @@ function main()
         x_gt = SampleMotionModel(𝒫, ak, x_gt)
 
         #generate observation
-        z = GenerateObservation(𝒫, x_gt)
+        z = GenerateObservationFromBeacons(𝒫, x_gt)
 
         #generate beliefs
         x_deadreckoning = PropagateBelief(x_deadreckoning, 𝒫, ak)
@@ -60,7 +60,7 @@ function main()
         covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, n_std=1, label = "", color = "blue")
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
-    scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
+    scatter!([b[1] for b in beacons], [b[2] for b in beacons], label="beacons", markershape = :hexagon)
     savefig(p,"simBeacons_dead_reckoning.pdf")
 
     ##----- plot kalman_filter
@@ -71,7 +71,7 @@ function main()
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!([x[1] for x in Hist_obs], [x[2] for x in Hist_obs], label="measurements", markersize=3)
-    scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
+    scatter!([b[1] for b in beacons], [b[2] for b in beacons], label="beacons", markershape = :hexagon)
     savefig(p,"simBeacons_kalman.pdf")
 
     print("finished\n")
