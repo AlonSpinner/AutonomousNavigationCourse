@@ -1,4 +1,3 @@
-using Revise
 using Distributions
 using Random
 using LinearAlgebra
@@ -6,7 +5,10 @@ using Plots
 using StatsPlots
 using Parameters
 
+module MyModule
+
 const STATE_SIZE = 2
+const I2 = Matrix{Float64}(I(STATE_SIZE))
 
 @with_kw mutable struct POMDPscenario
     F::Array{Float64, 2}   
@@ -33,8 +35,7 @@ function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1
 end 
 
 
-
-function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, o::Array{Float64, 1})::FullNormal
+function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, z::Array{Float64, 1})::FullNormal
     # kalman filter litrature from probobalistic robotics
     μb, Σb = b.μ, b.Σ
     F  = 𝒫.F
@@ -46,8 +47,8 @@ function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Floa
     Σp = F * Σb * F' + Σw
     # update
     K = Σp * H' * inv(H*Σp*H'+Σv)
-    μb′ = μp + K*(o-H*μp) 
-    Σb′ = (I(STATE_SIZE) - K*H)*Σp
+    μb′ = μp + K*(z-H*μp) 
+    Σb′ = (I - K*H)*Σp
     return MvNormal(μb′, Σb′)
 end    
 
@@ -98,38 +99,42 @@ function main()
     
     #Initalization
     x_gt, x_kalman, x_deadreckoning  = xgt0, b0, b0
-    Hist_gt, Hist_obs = [x_gt], []
-    Hist_deadreckoning, Hist_kalman  = [b0], [b0]
+    Hist_gt, Hist_obs_gps = [x_gt], []
+    Hist_deadreckoning, Hist_kalman_gps  = [b0], [b0]
     for _ in 1:T-1
         #move robot
         x_gt = SampleMotionModel(𝒫, ak, x_gt)
 
         #generate GPS observation
-        z = GenerateObservation(𝒫, x_gt)
+        z_gps = GenerateObservation(𝒫, x_gt)
 
         #generate beliefs
         x_deadreckoning = PropagateBelief(x_deadreckoning, 𝒫, ak)
-        x_kalman = PropagateUpdateBelief(x_kalman, 𝒫, ak, z)
+        x_kalman_gps = PropagateUpdateBelief(x_kalman, 𝒫, ak, z_gps)
 
         #record to history
         push!(Hist_gt,x_gt)
-        push!(Hist_obs,z)
+        push!(Hist_obs_gps,z_gps)
         push!(Hist_deadreckoning,x_deadreckoning)
-        push!(Hist_kalman,x_kalman)
+        push!(Hist_kalman_gps,x_kalman_gps)
     end
-    
-    # # plots 
-    fig=scatter([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
-    for i in 1:T
-        covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, showaxes=true, n_std=1, label="step $i")
-    end
-    savefig(fig,"dead_reckoning.pdf")
 
-    # tr=scatter([x[1] for x in τ], [x[2] for x in τ], label="gt")
-    # for i in 1:T
-    #     covellipse!(τb[i].μ, τb[i].Σ, showaxes=true, n_std=1, label="step $i")
-    # end
-    # savefig(tr,"tr.pdf")
+    ##----- plot dead_reckoning
+    p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
+    scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
+    for i in 1:T
+        covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, n_std=1, label="step $i")
+    end
+    savefig(p,"dead_reckoning.pdf")
+
+    ##----- plot kalman_filter
+    p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
+    scatter!([x[1] for x in Hist_obs_gps], [x[2] for x in Hist_obs_gps], label="gps measurements")
+    for i in 1:T
+        covellipse!(Hist_kalman_gps[i].μ, Hist_kalman_gps[i].Σ, n_std=1, label="step $i")
+    end
+    savefig(p,"Hist_kalman_gps.pdf")
+
            
     # xgt0 = [-0.5, -0.2]           
     # ak = [0.1, 0.1]           
