@@ -1,18 +1,11 @@
-module ModelsAndScenario
 using Revise
 using Distributions
 using Random
 using LinearAlgebra
 using Parameters
 
-export POMDPscenario, PropagateBelief, 
-        PropagateUpdateBelief, 
-        SampleMotionModel, 
-        GenerateObservation,
-        GenerateObservationFromBeacons
-
 const STATE_SIZE = 2
-const I2 = Matrix{Float64}(I(STATE_SIZE))
+const I₂ = Matrix{Float64}(I(STATE_SIZE))
 
 @with_kw mutable struct POMDPscenario
     F::Array{Float64, 2}   
@@ -20,11 +13,10 @@ const I2 = Matrix{Float64}(I(STATE_SIZE))
     Σw::Array{Float64, 2}
     Σv::Array{Float64, 2}
     rng::MersenneTwister
-    beacons::Array{Float64, 2}
-    d::Float64
-    rmin::Float64
+    beacons::Array{Float64, 2} = I₂
+    d::Float64 = 0.0
+    rmin::Float64 = 0.0
 end
-
 
 function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1})::FullNormal
     
@@ -37,7 +29,6 @@ function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1
     Σp = F * Σb * F' + Σw
     return MvNormal(μp, Σp)
 end 
-
 
 function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, z::Array{Float64, 1})::FullNormal
     # kalman filter litrature from probobalistic robotics
@@ -69,15 +60,27 @@ function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1})
 end   
 
 
-function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1})::Union{NamedTuple, Nothing}
-    distances = # calculate distances from x to all beacons
+function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1}, 
+                                        fixedCov::Bool = false)::Union{NamedTuple, Nothing}
+    distances = [norm(x-b) for b in 𝒫.beacons]
     for (index, distance) in enumerate(distances)
         if distance <= 𝒫.d
-            obs = # add your code for creating observation here 
-            return (obs=obs, index=index) 
+            if fixedCov
+                Σv = 𝒫.Σv
+            else
+                Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv
+            end
+            noise = rand(𝒫.rng,MvNormal([0,0],Σv))
+            obs = 𝒫.H * x + noise
+            return (obs=obs, index=index) #assumes only 1 beacon is in range
         end    
     end 
     return nothing    
-end    
+end
 
-end #module
+function OrderBeacons(x,y)::Matrix{Float64}
+    X = x' .* ones(3)
+    Y  = ones(3)' .* y
+    return hcat(X[:],Y[:])
+end
+
