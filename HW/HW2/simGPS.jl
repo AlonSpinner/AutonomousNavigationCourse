@@ -45,7 +45,7 @@ function main()
     ##----- plot dead_reckoning
     p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
     for i in 1:T
-        covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, n_std=1, label="step $i")
+        covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, n_std=3, label="step $i")
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     savefig(p,"simGPS_dead_reckoning.pdf")
@@ -53,7 +53,7 @@ function main()
     ##----- plot kalman_filter
     p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
     for i in 1:T
-        covellipse!(Hist_kalman[i].μ, Hist_kalman[i].Σ, n_std=1, label="step $i")
+        covellipse!(Hist_kalman[i].μ, Hist_kalman[i].Σ, n_std=3, label="step $i")
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!([x[1] for x in Hist_obs], [x[2] for x in Hist_obs], label="measurements", markersize=3)

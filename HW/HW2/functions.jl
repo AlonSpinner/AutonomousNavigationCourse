@@ -13,6 +13,8 @@ const I₂ = Matrix{Float64}(I(STATE_SIZE))
     Σw::Array{Float64, 2}
     Σv::Array{Float64, 2}
     rng::MersenneTwister
+    #optional: only used in beams case
+    Σv₀::Array{Float64, 2} = I₂
     beacons::Array{Float64, 2} = I₂
     d::Float64 = 0.0
     rmin::Float64 = 0.0
@@ -60,19 +62,16 @@ function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1})
 end   
 
 
-function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1}, 
-                                        fixedCov::Bool = false)::Union{NamedTuple, Nothing}
-    distances = [norm(x-b) for b in 𝒫.beacons]
+function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1}; rangeDependentCov::Bool = false)
+    distances = [norm(x-b) for b in eachrow(𝒫.beacons)]
     for (index, distance) in enumerate(distances)
         if distance <= 𝒫.d
-            if fixedCov
-                Σv = 𝒫.Σv
-            else
-                Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv
+            if rangeDependentCov
+                𝒫.Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv₀
             end
-            noise = rand(𝒫.rng,MvNormal([0,0],Σv))
-            obs = 𝒫.H * x + noise
-            return (obs=obs, index=index) #assumes only 1 beacon is in range
+            noise = rand(𝒫.rng,MvNormal([0,0],𝒫.Σv))
+            z = 𝒫.H * x + noise
+            return z #assumes only 1 beacon is in range
         end    
     end 
     return nothing    
@@ -82,7 +81,6 @@ function OrderBeacons(x,y)::Array{Float64, 2}
     X = x' .* ones(3)
     Y  = ones(3)' .* y
     beacons = hcat(X[:],Y[:])
-    beacons = [r[:] for r in eachrow(beacons)]
     return beacons
 end
 
