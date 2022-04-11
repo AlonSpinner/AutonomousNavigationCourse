@@ -3,7 +3,7 @@ using Distributions
 using Random
 using Plots
 using StatsPlots
-includet("./functions.jl") #include and track changes
+includet("./00_functions.jl") #include and track changes
 
 function main()
     # definition of the random number generator with seed 
@@ -77,7 +77,7 @@ function main()
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
-    savefig(p,"simBeacons_dead_reckoning.pdf")
+    savefig(p,"./out/02_simBeacons_dead_reckoning.pdf")
 
     ##----- plot kalman_filter_nonFixedObsCov
     p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
@@ -88,7 +88,7 @@ function main()
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!([x[1] for x in Hist_obs_nonFixedObsCov], [x[2] for x in Hist_obs_nonFixedObsCov], label="measurements", markersize=3)
     scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
-    savefig(p,"simBeacons_kalman_nonFixedCov.pdf")
+    savefig(p,"./out/02_simBeacons_kalman_nonFixedCov.pdf")
 
     ##----- plot kalman_filter_fixedObsCov
     p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
@@ -99,7 +99,7 @@ function main()
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!([x[1] for x in Hist_obs_fixedObsCov], [x[2] for x in Hist_obs_fixedObsCov], label="measurements", markersize=3)
     scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
-    savefig(p,"simBeacons_kalman_fixedCov.pdf")
+    savefig(p,"./out/02_simBeacons_kalman_fixedCov.pdf")
 
     ##---- plot comparison between methods: forbenius norm
     p = plot(; xlabel="time step", ylabel="forbenius error",  grid=:true, legend=:outertopright, legendfont=font(5))
@@ -111,7 +111,7 @@ function main()
     end
     plot!(error_fixedCov, label="fixed covariance")
     plot!(error_nonFixedCov, label="range dependant covariance")
-    savefig(p,"simBeacons_errorComparison.pdf")
+    savefig(p,"./out/02_simBeacons_errorComparison.pdf")
 
     ##---- plot comparison between methods: covariance trace
     p = plot(; xlabel="time step", ylabel="posterior covariance trace",  grid=:true, legend=:outertopright, legendfont=font(5))
@@ -123,7 +123,7 @@ function main()
     end
     plot!(trace_fixedCov, label="fixed covariance")
     plot!(trace_nonFixedCov, label="range dependant covariance")
-    savefig(p,"simBeacons_posteriorCovTraceComparison.pdf")
+    savefig(p,"./out/02_simBeacons_posteriorCovTraceComparison.pdf")
 
     print("finished\n")
 end

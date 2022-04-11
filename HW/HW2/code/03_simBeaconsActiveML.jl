@@ -4,7 +4,7 @@ using Random
 using Plots
 using StatsPlots
 using Colors, ColorSchemes
-includet("./functions.jl") #include and track changes
+includet("./00_functions.jl") #include and track changes
 
 function main()
     # definition of the random number generator with seed 
@@ -65,14 +65,11 @@ function main()
         end
     end
     scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
-    savefig(p,"simBeaconsActive_planning.pdf")
+    savefig(p,"./out/03_simBeaconsActiveML_planning.pdf")
 
     ##----- plot J 
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
-    # for i = 1:N
-    #     bar!(i,𝒥[i])
-    # end
-    savefig(p,"simBeaconsActive_cost.pdf")
+    savefig(p,"./out/03_simBeaconsActiveML_cost.pdf")
 end
 
 main()

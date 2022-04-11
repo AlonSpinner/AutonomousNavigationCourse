@@ -77,10 +77,59 @@ function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1
     return nothing    
 end
 
+function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
+    #https://en.wikipedia.org/wiki/Unscented_transform
+    #https://drive.google.com/file/d/0By_SW19c1BfhSVFzNHc0SjduNzg/view?resourcekey=0-41olC9ht9xE3wQe2zHZ45A
+    distances = [norm(x-b) for b in eachrow(𝒫.beacons)]
+    for distance in distances
+        if distance <= 𝒫.d
+            z = MvNormal(𝒫.H * x.μ ,𝒫.H * x.Σ * 𝒫.H' + 𝒫.Σv)
+            zi, wi = generateSigmaPoints(z)
+            return (points = zi, weights = wi) #assumes only 1 beacon is in range
+        end    
+    end 
+    return nothing    
+end
+
 function OrderBeacons(x,y)::Array{Float64, 2}
     X = x' .* ones(3)
     Y  = ones(3)' .* y
     beacons = hcat(X[:],Y[:])
     return beacons
 end
+
+function generateSigmaPoints(p::MvNormal; β = 2, α = 1, n = 3)
+    κ = 3 - n
+    λ = α^2 * (n+κ) - n
+    M = sqrt(n+λ)*p.Σ
+
+    points = zeros(n,2*n+1)
+    for i=1:n
+        points[:,i] = p.μ + M[:,i]
+    end
+    for i=n+1:2*n
+        points[:,i] = p.μ - M[:,i]
+    end
+    points[:,2n+1] = p.μ
+
+    weights = 0.5/(n+λ) * ones(2*n+1)
+    weight[end] = λ/(n+λ)
+
+    return points, weights
+end
+
+# function computeCost(bk,a,T)
+#     if T == 0
+#         return costTerminal(bk)
+#     end
+    
+#     J = cost(bk,a[1])
+
+#     bkp1⁻ = predict(bk,a[1])
+#     z = computeSigmaPoints(bkp1⁻)
+#     for point,weight in zip(z.points,z.weights):
+#         bkp1 = UpdateBelief(bkp1⁻,𝒫, point)
+#         J += weight * computeCost(bkp1,a[2:end],T-1)
+#     end
+# end
 

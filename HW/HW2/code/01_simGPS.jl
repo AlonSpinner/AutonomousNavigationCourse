@@ -3,7 +3,7 @@ using Distributions
 using Random
 using Plots
 using StatsPlots
-includet("./functions.jl") #include and track changes
+includet("./00_functions.jl") #include and track changes
 
 function main()
     # definition of the random number generator with seed 
@@ -48,7 +48,7 @@ function main()
         covellipse!(Hist_deadreckoning[i].μ, Hist_deadreckoning[i].Σ, n_std=3, label="step $i")
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
-    savefig(p,"simGPS_dead_reckoning.pdf")
+    savefig(p,"./out/01_simGPS_dead_reckoning.pdf")
 
     ##----- plot kalman_filter
     p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
@@ -57,7 +57,7 @@ function main()
     end
     scatter!([x[1] for x in Hist_gt], [x[2] for x in Hist_gt], label="gt")
     scatter!([x[1] for x in Hist_obs], [x[2] for x in Hist_obs], label="measurements", markersize=3)
-    savefig(p,"simGPS_kalman.pdf")
+    savefig(p,"./out/01_simGPS_kalman.pdf")
 
     print("finished\n")
 end
