@@ -108,14 +108,14 @@ end
 function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
     distance = minimum([norm(x.μ-b) for b in eachrow(𝒫.beacons)])
     if distance <= 𝒫.d
-        z = MvNormal(𝒫.H * x.μ ,𝒫.H * x.Σ * 𝒫.H' + 𝒫.Σv)
+        z = MvNormal(𝒫.H * x.μ ,𝒫.Σv)
         zi, wi = generateSigmaPoints(z)
         return (points = zi, weights = wi) #assumes only 1 beacon is in range
     end 
     return nothing    
 end
 
-function J_beacons(𝒫::POMDPscenario,bk::FullNormal,A,r, rₜ)
+function J_beacons(𝒫::POMDPscenario,bk::FullNormal,A,r, rₜ; mod = 4)
     #bk - belief in step k 
     #A - sequence of actions to be taken [ak,akp1,akp2...]
     #T - timer step
@@ -127,9 +127,9 @@ function J_beacons(𝒫::POMDPscenario,bk::FullNormal,A,r, rₜ)
     
     J = r(bk,A[1])
 
-    bkp1⁻ = PropagateBelief(bk,𝒫,A[1]) #predict step
+    bkp1⁻ = PropagateBelief(bk,𝒫,A[1]) #motion model
     z = GenerateSigmaPointsFromBeacons(𝒫,bkp1⁻)
-    if ~isnothing(z) && (size(A)[1] % 10 == 0)
+    if ~isnothing(z) && (size(A)[1] % mod == 0)
         for (point,weight) in zip(z.points,z.weights)
             #weights ~ probabilities, already normalized
             bkp1 = UpdateBelief(bkp1⁻,𝒫, point)

@@ -51,6 +51,7 @@ function main()
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
     savefig(p,"./out/04_simBeaconsActiveSigmaPoints_cost.pdf")
     
+    print(𝒥)
     print("finished\n")
 end
 

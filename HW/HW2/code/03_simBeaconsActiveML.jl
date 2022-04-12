@@ -31,28 +31,28 @@ function main()
     #Initalization
     ℬ = [[b0] for _ in 1:N]
     𝒥 = zeros(10)
-    c(a,b) = det(b)
-    for (i, a) in enumerate(𝒜)
+    cost(a,b) = det(b)
+    for (i, 𝒜ᵢ) in enumerate(𝒜)
         for t in 1:T-1
-            ak = a[t,:]
-            𝒥[i] += c(ak,ℬ[i][end].Σ)
+            ak = 𝒜ᵢ[t,:]
+            𝒥[i] += cost(ak,ℬ[i][end].Σ)
             
-            #generate beliefs
-            x_predict = PropagateBelief(ℬ[i][end], 𝒫, ak)
+            #motion model
+            x⁻ = PropagateBelief(ℬ[i][end], 𝒫, ak)
             
-            #generate observation x_predict.mu and update with it if possible
-            distance = minimum([norm(x_predict.μ-b) for b in eachrow(𝒫.beacons)])
+            #if possible: generate observation and update with it 
+            distance = minimum([norm(x⁻.μ-b) for b in eachrow(𝒫.beacons)])
             if distance <= 𝒫.d
-                z =  x_predict.μ
-                x′ = PropagateUpdateBelief(ℬ[i][end], 𝒫, ak, z)
+                z =  x⁻.μ
+                x′ = UpdateBelief(x⁻, 𝒫, z)
             else
-                x′ = x_predict #update == predict if no measurement
+                x′ = x⁻ #update == predict if no measurement
             end
 
             #add to belief
             push!(ℬ[i],x′)           
         end
-        𝒥[i] += c(0,ℬ[i][end].Σ) #terminal cost
+        𝒥[i] += cost(0,ℬ[i][end].Σ) #terminal cost
     end
 
     ##----- plot trajectories 
@@ -71,6 +71,7 @@ function main()
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
     savefig(p,"./out/03_simBeaconsActiveML_cost.pdf")
     
+    print(𝒥)
     print("finished\n")
 end
 
