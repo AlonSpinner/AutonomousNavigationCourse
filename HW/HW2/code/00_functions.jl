@@ -21,10 +21,9 @@ const I₂ = Matrix{Float64}(I(STATE_SIZE))
 end
 
 function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1})::FullNormal
-    
     μb, Σb = b.μ, b.Σ
     F  = 𝒫.F
-    Σw, Σv = 𝒫.Σw, 𝒫.Σv
+    Σw = 𝒫.Σw
     
     # predict
     μp = F * μb  + a
@@ -32,21 +31,24 @@ function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1
     return MvNormal(μp, Σp)
 end 
 
-function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, z::Array{Float64, 1})::FullNormal
-    # kalman filter litrature from probobalistic robotics
-    μb, Σb = b.μ, b.Σ
-    F  = 𝒫.F
+function UpdateBelief(bp::FullNormal,𝒫::POMDPscenario, z::Array{Float64, 1})::FullNormal
+    #bp - belief + predict
+    μp, Σp = bp.μ, bp.Σ
     H  = 𝒫.H
-    Σw, Σv = 𝒫.Σw, 𝒫.Σv
-    
-    # kalman predict
-    μp = F * μb  + a
-    Σp = F * Σb * F' + Σw
+    Σv = 𝒫.Σv
+
     # update
     K = Σp * H' * inv(H*Σp*H'+Σv)
     μb′ = μp + K*(z-H*μp) 
     Σb′ = (I - K*H)*Σp
     return MvNormal(μb′, Σb′)
+end
+
+function PropagateUpdateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1}, z::Array{Float64, 1})::FullNormal
+    # kalman filter litrature from probobalistic robotics
+    bp = PropagateBelief(b,𝒫,a)
+    b′ = UpdateBelief(bp,𝒫,z)
+    return b′
 end    
 
 function SampleMotionModel(𝒫::POMDPscenario, a::Array{Float64, 1}, x::Array{Float64, 1})
@@ -55,39 +57,23 @@ function SampleMotionModel(𝒫::POMDPscenario, a::Array{Float64, 1}, x::Array{F
     return x′
 end 
 
-function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1})
+function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1}) #GPS
     noise = rand(𝒫.rng,MvNormal([0,0],𝒫.Σv))
     x′ = 𝒫.H * x + noise
     return x′
 end   
 
-
 function GenerateObservationFromBeacons(𝒫::POMDPscenario, x::Array{Float64, 1}; rangeDependentCov::Bool = false)
     distances = [norm(x-b) for b in eachrow(𝒫.beacons)]
-    for (index, distance) in enumerate(distances)
-        if distance <= 𝒫.d
-            if rangeDependentCov
-                𝒫.Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv₀
-            end
-            noise = rand(𝒫.rng,MvNormal([0,0],𝒫.Σv))
-            z = 𝒫.H * x + noise
-            return z #assumes only 1 beacon is in range
-        end    
-    end 
-    return nothing    
-end
-
-function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
-    #https://en.wikipedia.org/wiki/Unscented_transform
-    #https://drive.google.com/file/d/0By_SW19c1BfhSVFzNHc0SjduNzg/view?resourcekey=0-41olC9ht9xE3wQe2zHZ45A
-    distances = [norm(x-b) for b in eachrow(𝒫.beacons)]
-    for distance in distances
-        if distance <= 𝒫.d
-            z = MvNormal(𝒫.H * x.μ ,𝒫.H * x.Σ * 𝒫.H' + 𝒫.Σv)
-            zi, wi = generateSigmaPoints(z)
-            return (points = zi, weights = wi) #assumes only 1 beacon is in range
-        end    
-    end 
+    distance = minimum(distances .- 𝒫.d)
+    if distance <= 𝒫.d
+        if rangeDependentCov
+            𝒫.Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv₀
+        end
+        noise = rand(𝒫.rng,MvNormal([0,0],𝒫.Σv))
+        z = 𝒫.H * x + noise
+        return z #assumes only 1 beacon is in range
+    end    
     return nothing    
 end
 
@@ -98,38 +84,64 @@ function OrderBeacons(x,y)::Array{Float64, 2}
     return beacons
 end
 
-function generateSigmaPoints(p::MvNormal; β = 2, α = 1, n = 3)
+function generateSigmaPoints(p::FullNormal; β = 2, α = 1, n = 3)
+    #https://en.wikipedia.org/wiki/Unscented_transform
+    #https://drive.google.com/file/d/0By_SW19c1BfhSVFzNHc0SjduNzg/view?resourcekey=0-41olC9ht9xE3wQe2zHZ45A
     κ = 3 - n
     λ = α^2 * (n+κ) - n
     M = sqrt(n+λ)*p.Σ
 
+    points = Array{Array{Float64, 2}, 2*n+1}
+    weights = Array{Float64, 2*n+1}
+
     points = zeros(n,2*n+1)
     for i=1:n
-        points[:,i] = p.μ + M[:,i]
+        points[i] = p.μ + M[:,i]
     end
     for i=n+1:2*n
-        points[:,i] = p.μ - M[:,i]
+        points[i] = p.μ - M[:,i]
     end
-    points[:,2n+1] = p.μ
+    points[2*n+1] = p.μ
 
     weights = 0.5/(n+λ) * ones(2*n+1)
-    weight[end] = λ/(n+λ)
+    weight[2*n+1] = λ/(n+λ) #overwrite
 
     return points, weights
 end
 
-# function computeCost(bk,a,T)
-#     if T == 0
-#         return costTerminal(bk)
-#     end
+function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
+    distances = [norm(x-b) for b in eachrow(𝒫.beacons)]
+    distance = minimum(distances .- 𝒫.d)
+    if distance <= 𝒫.d
+        z = MvNormal(𝒫.H * x.μ ,𝒫.H * x.Σ * 𝒫.H' + 𝒫.Σv)
+        zi, wi = generateSigmaPoints(z)
+        return (points = zi, weights = wi) #assumes only 1 beacon is in range
+    end 
+    return nothing    
+end
+
+function J_beacons(𝒫::POMDPscenario,bk::FullNormal,A:: Vector{Vector{Float64}},T::Int64,r::Function, rₜ:: Function)
+    #bk - belief in step k 
+    #A - sequence of actions to be taken [ak,akp1,akp2...]
+    #T - timer step
+    #r - reward/cost(bk,a)
     
-#     J = cost(bk,a[1])
+    if T == 0
+        return rₜ(bk) #terminal cost is same as regular
+    end
+    
+    J = r(bk,A[1])
 
-#     bkp1⁻ = predict(bk,a[1])
-#     z = computeSigmaPoints(bkp1⁻)
-#     for point,weight in zip(z.points,z.weights):
-#         bkp1 = UpdateBelief(bkp1⁻,𝒫, point)
-#         J += weight * computeCost(bkp1,a[2:end],T-1)
-#     end
-# end
-
+    bkp1⁻ = PropagateBelief(bk,𝒫,A[1]) #predict step
+    z = GenerateSigmaPointsFromBeacons(𝒫,bkp1⁻)
+    if isnothing(z)
+        bkp1 = bkp1⁻
+        J += J_beacons(𝒫,bkp1,A[2:end],T-1,r,rₜ)
+    else
+        for (point,weight) in zip(z.points,z.weights)
+            #weights ~ probabilities, already normalized
+            bkp1 = UpdateBelief(bkp1⁻,𝒫, point)
+            J += weight * J_beacons(𝒫,bkp1,A[2:end],T-1,r,rₜ)
+        end
+    end
+end

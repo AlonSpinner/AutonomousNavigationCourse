@@ -20,7 +20,6 @@ function main()
                         H = I₂,
                         Σw = 0.1^2*I₂,
                         Σv = 0.01^2*I₂, 
-                        Σv₀ = 0.01^2*I₂, 
                         rng = rng , 
                         beacons=beacons, 
                         d=d, rmin=rmin) 

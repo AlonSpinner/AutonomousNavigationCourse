@@ -12,6 +12,7 @@ function main()
     μ0 = [0.0,0.0]
     Σ0 = I₂
     b0 = MvNormal(μ0, Σ0)
+    generateSigmaPoints(b0)
     d =1.0 
     rmin = 0.1
 
@@ -20,57 +21,26 @@ function main()
                         H = I₂,
                         Σw = 0.1^2*I₂,
                         Σv = 0.01^2*I₂, 
-                        Σv₀ = 0.01^2*I₂, 
                         rng = rng , 
                         beacons=beacons, 
                         d=d, rmin=rmin) 
 
     T = 100
-    N= 10 #amount of trajectories
+    N = 10 #amount of trajectories
     𝒜 = [repeat([0.1,0.1*j/5]',T-1,1) for j in 1:N] #action sequences
    
-    #Initalization
-    ℬ = [[b0] for _ in 1:N]
+    #cost functions
+    cost(a,b) = det(b)
+    costₜ = cost #terminal
+
     𝒥 = zeros(10)
-    c(a,b) = det(b)
-    for (i, a) in enumerate(𝒜)
-        for t in 1:T-1
-            ak = a[t,:]
-            𝒥[i] += c(ak,ℬ[i][end].Σ)
-            
-            #generate beliefs
-            x_predict = PropagateBelief(ℬ[i][end], 𝒫, ak)
-
-            #generate observation
-            z = GenerateSigmaPointsFromBeacons(𝒫, x_predict.μ)
-
-            if isnothing(z)
-                x = PropagateBelief(ℬ[i][end], 𝒫, ak)
-            else
-                x = PropagateUpdateBelief(ℬ[i][end], 𝒫, ak, x_predict.μ)
-            end
-
-            #add to belief
-            push!(ℬ[i],x)           
-        end
-        𝒥[i] += c(0,ℬ[i][end].Σ) #terminal cost
+    for (i, 𝒜ᵢ) in enumerate(𝒜)
+        𝒥[i] = J_beacons(𝒫,b0,𝒜ᵢ,100,cost,costₜ)
     end
-
-    ##----- plot trajectories 
-    colors = range(HSL(colorant"red"), stop=HSL(colorant"green"), length=N)
-    p = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5))
-    for i = 1:N
-        covellipse!(ℬ[i][1].μ, ℬ[i][1].Σ, n_std=1, label = "τ " * string(i), color = colors[i])
-        for t in 2:T
-            covellipse!(ℬ[i][t].μ, ℬ[i][t].Σ, n_std=1, label = "", color = colors[i])
-        end
-    end
-    scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon)
-    savefig(p,"./out/03_simBeaconsActiveML_planning.pdf")
 
     ##----- plot J 
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
-    savefig(p,"./out/03_simBeaconsActiveML_cost.pdf")
+    savefig(p,"./out/04_simBeaconsActiveSigmaPoints_cost.pdf")
 end
 
 main()
