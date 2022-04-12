@@ -39,17 +39,18 @@ function main()
             
             #generate beliefs
             x_predict = PropagateBelief(ℬ[i][end], 𝒫, ak)
-            #generate observation
-            z = GenerateObservationFromBeacons(𝒫, x_predict.μ; rangeDependentCov = false) #just to check if we are in range of a beacon
-
-            if isnothing(z)
-                x = PropagateBelief(ℬ[i][end], 𝒫, ak)
+            
+            #generate observation x_predict.mu and update with it if possible
+            distance = minimum([norm(x_predict.μ-b) for b in eachrow(𝒫.beacons)])
+            if distance <= 𝒫.d
+                z =  x_predict.μ
+                x′ = PropagateUpdateBelief(ℬ[i][end], 𝒫, ak, z)
             else
-                x = PropagateUpdateBelief(ℬ[i][end], 𝒫, ak, x_predict.μ)
+                x′ = x_predict #update == predict if no measurement
             end
 
             #add to belief
-            push!(ℬ[i],x)           
+            push!(ℬ[i],x′)           
         end
         𝒥[i] += c(0,ℬ[i][end].Σ) #terminal cost
     end
@@ -69,6 +70,8 @@ function main()
     ##----- plot J 
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
     savefig(p,"./out/03_simBeaconsActiveML_cost.pdf")
+    
+    print("finished\n")
 end
 
 main()

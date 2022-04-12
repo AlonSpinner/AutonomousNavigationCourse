@@ -27,20 +27,31 @@ function main()
 
     T = 100
     N = 10 #amount of trajectories
-    𝒜 = [repeat([0.1,0.1*j/5]',T-1,1) for j in 1:N] #action sequences
+    𝒜 = []
+    for j = 1:N
+        𝒜ⱼ = []
+        for t = 1: T-1
+            push!(𝒜ⱼ,[0.1,0.1*j/5])
+        end
+        push!(𝒜,𝒜ⱼ)
+    end
    
     #cost functions
-    cost(a,b) = det(b)
-    costₜ = cost #terminal
+    cost(b,a) = det(b.Σ)
+    costₜ(b) = det(b.Σ) #terminal
 
     𝒥 = zeros(10)
     for (i, 𝒜ᵢ) in enumerate(𝒜)
-        𝒥[i] = J_beacons(𝒫,b0,𝒜ᵢ,100,cost,costₜ)
+        print("starting to compute trajectory "*string(i) * "\n")
+        𝒥[i] = J_beacons(𝒫,b0,𝒜ᵢ,cost,costₜ)
     end
 
     ##----- plot J 
+    colors = range(HSL(colorant"red"), stop=HSL(colorant"green"), length=N)
     p = bar(1:N,𝒥, fillcolor = colors, label = "", xlabel="τ", ylabel="cost")
     savefig(p,"./out/04_simBeaconsActiveSigmaPoints_cost.pdf")
+    
+    print("finished\n")
 end
 
 main()
