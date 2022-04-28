@@ -1,7 +1,6 @@
 using Revise
 using Graphs #note: Graphs.jl is a reboot of the LightGraphs package which was archived
 using SimpleWeightedGraphs
-using GraphPlot
 includet("./graphForwardSearch.jl") #include and track changes
 
 #create graph
