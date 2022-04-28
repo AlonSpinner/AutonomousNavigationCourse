@@ -2,6 +2,9 @@ using Revise
 using Graphs #note: Graphs.jl is a reboot of the LightGraphs package which was archived
 using SimpleWeightedGraphs
 using LinearAlgebra
+using GraphPlot
+using Compose #drawing to file
+import Cairo, Fontconfig #for PNG from Compose to work
 includet("./graphForwardSearch.jl") #include and track changes
 
 #create graph
@@ -38,7 +41,13 @@ LG = LocatedGraph(graph,V)
 s = 1
 τ = 5
 
+#do the thing
 h(LG::LocatedGraph,i::Int) = norm(LG.locations[i,:]-LG.locations[τ,:])
-
 println("my solution:")
 println(Astar(LG,s,τ,h))
+
+#plot to check myself - will return plot in 
+plt = gplot(graph, edgelabel = W, nodelabel = 1:nv(graph))
+draw(PNG("./out/01_test_Astar.png", 8cm, 8cm), plt)
+
+println("finished")

@@ -1,6 +1,9 @@
 using Revise
 using Graphs #note: Graphs.jl is a reboot of the LightGraphs package which was archived
 using SimpleWeightedGraphs
+using GraphPlot
+using Compose #drawing to file
+import Cairo, Fontconfig #for PNG from Compose to work
 includet("./graphForwardSearch.jl") #include and track changes
 
 #create graph
@@ -32,8 +35,14 @@ end
 s = 1
 τ = 5
 
+#do the thing
 println("my solution:")
 println(Dijkstra(graph,s,τ))
-
 println("package solution:")
 println(enumerate_paths(dijkstra_shortest_paths(graph, s), τ))
+
+#plot to check myself - will return plot in 
+plt = gplot(graph, edgelabel = W, nodelabel = 1:nv(graph))
+draw(PNG("./out/00_test_Dijkstra.png", 8cm, 8cm), plt)
+
+println("finished")
