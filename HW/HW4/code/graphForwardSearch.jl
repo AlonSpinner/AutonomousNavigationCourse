@@ -64,7 +64,6 @@ function Astar(LG::LocatedGraph, s::Int, τ::Int, h::Function)::Vector{Int}
     parent = zeros(Int,ne(G)) 
 
     while closedSet[τ] == false
-        #i = vertex in openSet with lowest g[i]
         i = argmin(f .+ Inf.*.!(openSet))  #add inf to every label not in openSet and then argmin
             
         openSet[i] = false 
@@ -75,7 +74,7 @@ function Astar(LG::LocatedGraph, s::Int, τ::Int, h::Function)::Vector{Int}
                 continue
             end
             c_ij = G.weights[i,j]
-            if g[i]+c_ij < g[j] #g[i]+h[i] < g[τ] + 0
+            if g[i]+c_ij < g[j]
                 g[j] = g[i] + c_ij
                 f[j] = g[j] + h(LG,j)
                 parent[j] = i
