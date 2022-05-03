@@ -3,13 +3,16 @@ using Distributions
 using Random
 using LinearAlgebra
 using Parameters
-using Graphs
-#using PlotlyJS
+using Graphs #note: Graphs.jl is a reboot of the LightGraphs package which was archived
 using Pkg
 using Plots
-#using PyPlot
 using StatsPlots
 using Colors, ColorSchemes
+using SimpleWeightedGraphs
+using GraphPlot
+using Compose #drawing to file
+import Cairo, Fontconfig #for PNG from Compose to work
+includet("./graphForwardSearch.jl") #include and track changes
 
 
 struct Point{T}
@@ -22,29 +25,28 @@ struct Line{T}
     e::Point{T}
 end
  
-# function intersection(l1::Line{T}, l2::Line{T}) where T<:Real
-#     a1 = l1.e.y - l1.s.y
-#     b1 = l1.s.x - l1.e.x
-#     c1 = a1 * l1.s.x + b1 * l1.s.y
- 
-#     a2 = l2.e.y - l2.s.y
-#     b2 = l2.s.x - l2.e.x
-#     c2 = a2 * l2.s.x + b2 * l2.s.y
- 
-#     Δ = a1 * b2 - a2 * b1
-#     # If lines are parallel, intersection point will contain infinite values
-#     return Point((b2 * c1 - b1 * c2) / Δ, (a1 * c2 - a2 * c1) / Δ)
-# end
-
 function intersection(l1::Line{T}, l2::Line{T}) where T<:Real
+    a1 = l1.e.y - l1.s.y
+    b1 = l1.s.x - l1.e.x
+    c1 = a1 * l1.s.x + b1 * l1.s.y
+ 
+    a2 = l2.e.y - l2.s.y
+    b2 = l2.s.x - l2.e.x
+    c2 = a2 * l2.s.x + b2 * l2.s.y
+ 
+    Δ = a1 * b2 - a2 * b1
+    # If lines are parallel, intersection point will contain infinite values
+    return Point((b2 * c1 - b1 * c2) / Δ, (a1 * c2 - a2 * c1) / Δ)
+end
+
 
 function croos(edge::Line,node_to_node::Line)
     intersection_point = intersection(edge,node_to_node) 
     println(intersection_point)
-    if (edge.s.x<intersection_point.x<edge.e.x || edge.e.x<intersection_point.x<edge.s.x)
-        if (edge.s.y<intersection_point.y<edge.e.y || edge.e.y<intersection_point.y<edge.s.y)
-            if (node_to_node.s.x<intersection_point.x<node_to_node.e.x || node_to_node.e.x<intersection_point.x<node_to_node.s.x)
-                if (node_to_node.s.y<intersection_point.y<node_to_node.e.y || node_to_node.e.y<intersection_point.y<node_to_node.s.y)
+    if (edge.s.x<=intersection_point.x<=edge.e.x || edge.e.x<=intersection_point.x<=edge.s.x)
+        if (edge.s.y<=intersection_point.y<=edge.e.y || edge.e.y<=intersection_point.y<=edge.s.y)
+            if (node_to_node.s.x<=intersection_point.x<=node_to_node.e.x || node_to_node.e.x<=intersection_point.x<=node_to_node.s.x)
+                if (node_to_node.s.y<=intersection_point.y<=node_to_node.e.y || node_to_node.e.y<=intersection_point.y<=node_to_node.s.y)
                     println("cross")
                     return true
                 end
@@ -78,18 +80,6 @@ function GeneratePRM(threshold::Float64, nodes_number::Integer, obstacles = Arra
         end
     end
 
-    plt =plot([Obs_X[1,1],Obs_X[1,2]],[Obs_Y[1,1],Obs_Y[1,2]])
-    savefig(plt,"./out/1.pdf")
-
-    plt = plot([Obs_X[1,1],Obs_X[1,2]], [Obs_Y[1,3],Obs_Y[1,4]])
-    savefig(plt,"./out/2.pdf")
-
-    plt = plot([Obs_X[1,1],Obs_X[1,1]],[Obs_Y[1,1],Obs_Y[1,3]])
-    savefig(plt,"./out/3.pdf")
-
-    plt = plot([Obs_X[1,2],Obs_X[1,2]], [Obs_Y[1,1],Obs_Y[1,3]])
-    savefig(plt,"./out/4.pdf")
-
     n = 0;
     Node=zeros(nodes_number,2)
     while(n<nodes_number) # create the nodes
@@ -111,7 +101,6 @@ function GeneratePRM(threshold::Float64, nodes_number::Integer, obstacles = Arra
                 DistMat[jj,zz] = dist; 
                 node_to_node = Line(Point{Float64}(refNode[1],refNode[2]), Point{Float64}(Node[zz,1],Node[zz,2]))
                 for qq = 1:num_of_obstacles
-
                     c1 = Line(Point{Float64}(Obs_X[qq,1],Obs_Y[qq,1]), Point{Float64}(Obs_X[qq,2],Obs_Y[qq,2])) # create the 4 egdes of the obstacle qq
                     c1_cross = croos(c1,node_to_node)
 
@@ -124,62 +113,79 @@ function GeneratePRM(threshold::Float64, nodes_number::Integer, obstacles = Arra
                     c4 = Line(Point{Float64}(Obs_X[qq,2],Obs_Y[qq,1]), Point{Float64}(Obs_X[qq,2],Obs_Y[qq,3]))
                     c4_cross = croos(c4,node_to_node)
 
-
                     if (c1_cross || c2_cross || c3_cross || c4_cross)
                          DistMat[jj,zz] = -1;
                     end
-
-                    # if (croos(c1,node_to_node) || croos(c2,node_to_node) || croos(c3,node_to_node) || croos(c4,node_to_node))
-                    #     DistMat[jj,zz] = -1;
-                    # end
                 end
             end
         end
     end
     println(DistMat)
 
-    for pp = 1:num_of_obstacles
-        x=[Obs_X[pp,1],Obs_X[pp,1],Obs_X[pp,2],Obs_X[pp,2],Obs_X[pp,1]]
-        y=[Obs_Y[pp,1],Obs_Y[pp,3],Obs_Y[pp,3],Obs_Y[pp,1],Obs_Y[pp,1]]
-        plt = plot!(Shape(x, y),label="", xlabel="X", ylabel="Y",c="red",xlims=[0,100],ylims=[0,100])
-        savefig(plt,"./out/aaa.pdf")
-    end
-
-
-
+    E = []; W= [] 
     for jj=1:nodes_number 
         for zz=jj+1:nodes_number
             if DistMat[jj,zz] != -1
-                plt = plot!(([Node[jj,1],Node[zz,1]],[Node[jj,2],Node[zz,2]]),label="")
-                savefig(plt,"./out/aaa.pdf")
+                push!(E,[jj,zz])
+                push!(W,DistMat[jj,zz])
             end
         end
     end
-
-    plt = plot!(Node[:,1], Node[:,2], seriestype = :scatter, label="")
-    savefig(plt,"./out/aaa.pdf")
-
-    # for ii = 1:nodes_number
-    #     DistCurr(ii) = norm([Node(1,1,ii) Node(1,2,ii)]);
-    # end
-
-    # scatter(Node(1,1,:),Node(1,2,:))#,'bo','LineWidth',2);
-    # savefig(a,"./out/aaa.pdf")
-    # (~,Xs) = min(DistCurr);
-    # (~,Xg) = max(DistCurr);
-    # figure(1)
-    # plot(Node(1,1,Xs),Node(1,2,Xs))#,'x','LineWidth',5,'MarkerSize',10)
-    # plot(Node(1,1,Xg),Node(1,2,Xg))#,'x','LineWidth',5,'MarkerSize',10)
-    
-    # G = struct
-    # G.Map     = Map;
-    # G.DistMat = DistMat;
-    # G.Node    = Node;
-    # G.ObsX    = ObsX;
-    # G.ObsY    = ObsY;
-    # G.Xs      = Xs;
-    # G.Xg      = Xg;
-    # return G
+    E = reduce(vcat,transpose.(E))
+    return Node, E, W, Obs_X, Obs_Y
 end
 
-GeneratePRM(50.0, 10, ones(15,10)) # threshold [20,50]  number_of_nodes = [100,500] 
+V, E, W, Obs_X, Obs_Y = GeneratePRM(50.0, 50, ones(15,10)) # threshold [20,50]  number_of_nodes = [100,500] 
+
+
+
+graph = SimpleWeightedGraph(size(V,1))
+for i in 1:length(W)
+    add_edge!(graph, E[i,1], E[i,2], W[i])
+end
+LG = LocatedGraph(graph,V)
+#----------------------------------------------------
+norma = zeros(length(V[:,1]))
+for i in length(V[:,1])
+    norma[i] = norm(V[i,:])
+end
+s = argmin(norma)
+τ = argmax(norma)
+#do the thing
+h(LG::LocatedGraph,i::Int) = norm(LG.locations[i,:]-LG.locations[τ,:])
+println(sizeof(W))
+println("my solution:")
+AS = Astar(LG,s,τ,h)
+println(AS)
+println("check")
+
+#plot to check myself - will return plot in 
+# plt = gplot(graph, edgelabel = W, nodelabel = 1:nv(graph))
+# draw(PNG("./out/02_test_Astar.png", 8cm, 8cm), plt)
+
+for pp = 1:15
+    x=[Obs_X[pp,1],Obs_X[pp,1],Obs_X[pp,2],Obs_X[pp,2],Obs_X[pp,1]]
+    y=[Obs_Y[pp,1],Obs_Y[pp,3],Obs_Y[pp,3],Obs_Y[pp,1],Obs_Y[pp,1]]
+    plt = plot!(Shape(x, y),label="", xlabel="X", ylabel="Y",c="red",xlims=[0,100],ylims=[0,100])
+    println("check")
+end
+
+Vas = V[AS,:]
+
+plt = plot!(Vas[:,1],Vas[:,2],label="", linewidth=10)
+savefig(plt,"./out/02_test_Astar.png")
+println("check")
+
+
+for jj=1:V[:,1]
+    for zz=jj+1:V[:,1]
+        if DistMat[jj,zz] != -1
+            plt = plot!(([Node[jj,1],Node[zz,1]],[Node[jj,2],Node[zz,2]]),label="")
+        end
+    end
+end
+
+plt = plot!(Node[:,1], Node[:,2], seriestype = :scatter, label="")
+savefig(plt,"./out/q1.pdf")
+
+println("finished")
