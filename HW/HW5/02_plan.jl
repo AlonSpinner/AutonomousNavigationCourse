@@ -59,13 +59,3 @@ function generateSigmaPoints(p::FullNormal; β = 2, α = 1, n = 2)
 
     return points, weights
 end
-
-function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
-    distance = minimum([norm(x.μ-b) for b in eachrow(𝒫.beacons)])
-    if distance <= 𝒫.d
-        z = MvNormal(𝒫.H * x.μ ,𝒫.Σv)
-        zi, wi = generateSigmaPoints(z)
-        return (points = zi, weights = wi) #assumes only 1 beacon is in range
-    end 
-    return nothing    
-end
