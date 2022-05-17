@@ -4,24 +4,33 @@ using Random
 using Plots
 using StatsPlots
 using Colors, ColorSchemes
-includet("./00_functions.jl") #include and track changes
+includet("./00_misc.jl")
+includet("./00_models.jl")
+includet("./00_plan.jl")
+includet("./00_real.jl")
 
 function main()
     x_goal = [9,9]
     x_gt = [-0.5, -0.2] #initial
 
     λ = 0.5
-    𝒫 = POMDPscenario(F= I₂,
+    cost(b,a) = norm(b.μ-x_goal) - λ*det(b.Σ)
+    costₜ(b) = norm(b.μ-x_goal) - λ*det(b.Σ)
+    beacons = OrderBeacons(LinRange(0,9,3), LinRange(0,9,3))
+    rng = MersenneTwister(1)
+    𝒫 = POMDPscenario(
+                        F= I₂,
                         H = I₂,
                         Σw = 0.1^2*I₂,
                         Σv₀ = 0.01^2*I₂, 
-                        rng = MersenneTwister(1) , 
-                        beacons=OrderBeacons(LinRange(0,9,3), LinRange(0,9,3)), 
+                        rng = rng, 
+                        beacons = beacons, 
                         d=1.0, 
-                        rmin=0.1.
+                        rmin=0.1,
                         𝒜 = [[1,0],[-1,0],[0,1],[0,-1],[1/√(2),1/√(2)],[-1/√(2),1/√(2)],[1/√(2),-1/√(2)],[-1/√(2),-1/√(2)],[0,0]],
-                        cost(b,a) = norm(b.μ-x_goal) - λ*det(b.Σ),
-                        costₜ(b) = norm(b.μ-x_goal) - λ*det(b.Σ) ) 
+                        cost = cost,
+                        costₜ = costₜ
+                        ) 
 
     T = 15 #steps 
     L = 15 #horrizon
