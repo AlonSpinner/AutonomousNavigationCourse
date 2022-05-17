@@ -8,75 +8,114 @@ const STATE_SIZE = 2
 const I₂ = Matrix{Float64}(I(STATE_SIZE))
 
 @with_kw mutable struct POMDPscenario
-    rng::MersenneTwister
-    F::Array{Float64, 2}   
-    H::Array{Float64, 2}
-    Σw::Array{Float64, 2}
-    Σv₀::Array{Float64, 2} = I₂
-    beacons::Array{Float64, 2} = I₂
-    d::Float64 = 0.0
-    rmin::Float64 = 0.0
+    rng :: MersenneTwister
+    F :: Matrix{Float}  
+    H :: Matrix{Float}
+    Σw :: Matrix{Float}
+    Σv₀ :: Matrix{Float} = I₂
+    beacons :: Matrix{Float} = I₂
+    d :: Float = 0.0
+    rmin :: Float = 0.0
+    cost :: Function
+    costₜ :: Function
+    𝒜 :: Vector{Vector{Float}}
 end
 
-function PropagateBelief(b::FullNormal, 𝒫::POMDPscenario, a::Array{Float64, 1})::FullNormal
-    μb, Σb = b.μ, b.Σ
+### FILTERING AND SENSING
+
+function PropagateBelief(𝒫::POMDPscenario, b::FullNormal, a::Vector{Float64})::FullNormal
+    μ, Σ = b.μ, b.Σ
     F  = 𝒫.F
     Σw = 𝒫.Σw
     
     # predict
-    μp = F * μb  + a
-    Σp = F * Σb * F' + Σw
-    return MvNormal(μp, Σp)
+    μ⁻ = F * μ  + a
+    Σ⁻ = F * Σ * F' + Σw
+    return MvNormal(μ⁻, Σ⁻)
 end 
 
-function UpdateBelief(bp::FullNormal,𝒫::POMDPscenario, z::Float64, r::float64)::FullNormal
+function UpdateBelief(𝒫::POMDPscenario, b⁻::FullNormal, z::Float64, r::float64)::FullNormal
     #bp - belief + predict
-    μp, Σp = bp.μ, bp.Σ
+    μ⁻, Σ⁻ = b⁻.μ, b⁻.Σ
     H  = 𝒫.H
     Σv = 𝒫.Σv₀ * max(r,𝒫.rmin)^2 #update covariance noise to fit measurement
 
     # update
-    K = Σp * H' * inv(H*Σp*H'+Σv)
-    μb′ = μp + K*(z-H*μp) 
-    Σb′ = (I - K*H)*Σp
-    return MvNormal(μb′, Σb′)
+    K = Σ⁻ * H' * inv(H*Σ⁻*H'+Σv)
+    μ⁺ = μ⁻ + K*(z-H*μ⁻) 
+    Σ⁺ = (I - K*H)*Σ⁻
+    return MvNormal(μ⁺, Σ⁺)
 end
 
-function TranistBeliefMDP(b::FullNormal, 𝒫::POMDPscenario, a, z::float64)
-    b⁻ = PropagateBelief(b,𝒫,a)
-    #if possible: generate observation and update with it 
-    r = minimum([norm(b⁻.μ-x) for x in eachrow(𝒫.beacons)])
-    if r <= 𝒫.d
-        z =  b⁻.μ
-        x′ = UpdateBelief(b⁻, 𝒫, z, distance)
+function TranistBeliefMDP(𝒫::POMDPscenario, b::FullNormal, a :: Vector{Float64}, obs::(float,float))
+    b⁻ = PropagateBelief(𝒫, b,a)
+    if obs !== nothing
+        b⁺ = UpdateBelief(𝒫, b⁻, obs.z, obs.r)
+        return b⁺
     else
-        x′ = x⁻ #update == predict if no measurement
-    end
+        return b⁻
 end
 
-function SampleMotionModel(𝒫::POMDPscenario, a::Array{Float64, 1}, x::Array{Float64, 1})
+function SampleMotionModel(𝒫::POMDPscenario, a::Vector{Float64}, x::Vector{Float64})::Vector{Float64}
     noise = rand(𝒫.rng,MvNormal([0;0],𝒫.Σw))
     x′ = 𝒫.F * x + a + noise
     return x′
 end 
 
 
-function GenerateObservation(𝒫::POMDPscenario, x::Array{Float64, 1})::Float64
+function GenerateObservation(𝒫::POMDPscenario, x::Vector{Float64})
     r = minimum([norm(x-b) for b in eachrow(𝒫.beacons)])
     if r <= 𝒫.d
         𝒫.Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv₀
         noise = rand(𝒫.rng,MvNormal([0,0],𝒫.Σv))
         z = 𝒫.H * x + noise
-        return z #assumes only 1 beacon is in range
+        return (z = z, r = r) #assumes only 1 beacon is in range
     end    
-    return nothing    
+    return nothing
 end
 
-function OrderBeacons(x,y)::Array{Float64, 2}
-    X = x' .* ones(3)
-    Y  = ones(3)' .* y
-    beacons = hcat(X[:],Y[:])
-    return beacons
+
+function ObservationModel(𝒫::POMDPscenario, b ::FullNormal)::FullNormal
+    r = minimum([norm(b.μ-beacon) for beacon in eachrow(𝒫.beacons)])
+    if r <= 𝒫.d
+        z = 𝒫.H * x
+        Σv = (max(distance,𝒫.rmin))^2 * 𝒫.Σv₀
+        return MvNormal(z,H*b.Σ*H' + Σv), r
+    end    
+    return nothing
+end
+
+### GENERATE PLAN
+
+function Plan(𝒫 :: POMDPscenario, b :: FullNormal, L :: Int)
+    #returns action and cost
+    if L <= 0
+        return (a = nothing, J = 𝒫.costₜ(b))
+    end
+    
+    best  = (a = nothing, J = Inf)
+    for a in 𝒫.𝒜
+        J = 𝒫.cost(b,a)
+        b⁻ = PropagateBelief(b, 𝒫, a)
+        
+        z, r = ObservationModel(𝒫, b⁻) #z::FullNormal
+        if z !== nothing
+            zᵢ, wᵢ = generateSigmaPoints(z) 
+            for i in len(zᵢ)
+                b⁺ = TranistBeliefMDP(b, 𝒫, a, (zᵢ[i], r))
+                a⁺, J⁺ = Plan(𝒫, b⁺, L-1)
+                J += J⁺*wᵢ[i]
+            end
+        else
+            a⁺, J⁺ = Plan(𝒫, b⁻, L-1)
+            J += J⁺
+        end
+        
+        if J < best.J
+            best = (a, J)
+        end
+    end
+    return best
 end
 
 function generateSigmaPoints(p::FullNormal; β = 2, α = 1, n = 2)
@@ -111,30 +150,11 @@ function GenerateSigmaPointsFromBeacons(𝒫::POMDPscenario, x::MvNormal)
     return nothing    
 end
 
-function J(𝒫::POMDPscenario,bk::FullNormal,A,r, rₜ; mod = 4)
-    #bk - belief in step k 
-    #A - sequence of actions to be taken [ak,akp1,akp2...]
-    #T - timer step
-    #r - reward/cost(bk,a)
+###--- MISC
 
-    if isempty(A)
-        return rₜ(bk) #terminal cost is same as regular
-    end
-    
-    cost = r(bk,A[1])
-
-    bkp1⁻ = PropagateBelief(bk,𝒫,A[1]) #motion model
-    z = GenerateSigmaPointsFromBeacons(𝒫,bkp1⁻)
-    if ~isnothing(z) && (size(A)[1] % mod == 0)
-        for (point,weight) in zip(z.points,z.weights)
-            #weights ~ probabilities, already normalized
-            bkp1 = UpdateBelief(bkp1⁻,𝒫, point)
-            cost += weight * J(𝒫,bkp1,A[2:end],r,rₜ)
-        end
-    else
-        bkp1 = bkp1⁻
-        cost += J(𝒫,bkp1,A[2:end],r,rₜ)
-    end
-
-    return cost
+function OrderBeacons(x,y)::Array{Float64, 2}
+    X = x' .* ones(3)
+    Y  = ones(3)' .* y
+    beacons = hcat(X[:],Y[:])
+    return beacons
 end
