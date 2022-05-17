@@ -5,7 +5,7 @@ using LinearAlgebra
 using Parameters
 
 includet("./00_misc.jl")
-includet("./00_models.jl")
+includet("./01_models.jl")
 
 function Plan(𝒫 :: POMDPscenario, b :: FullNormal, L :: Int)
     #returns action and cost
@@ -18,13 +18,13 @@ function Plan(𝒫 :: POMDPscenario, b :: FullNormal, L :: Int)
         J = 𝒫.cost(b,a)
         b⁻ = PropagateBelief(𝒫, b, a)
         
-        z, r = ObservationModel(𝒫, b⁻) #z::FullNormal
-        if z !== nothing
-            zᵢ, wᵢ = generateSigmaPoints(z) 
-            for i in len(zᵢ)
-                b⁺ = TranistBeliefMDP(𝒫, b, a, (zᵢ[i], r))
+        obs = ObservationModel(𝒫, b⁻) #Z::FullNormal
+        if obs !== nothing
+            zᵢ, wᵢ = generateSigmaPoints(obs.Z) 
+            for i in 1:length(zᵢ)
+                b⁺ = TranistBeliefMDP(𝒫, b, a, zᵢ[i], obs.r)
                 a⁺, J⁺ = Plan(𝒫, b⁺, L-1)
-                J += J⁺*wᵢ[i]
+                J += wᵢ[i] * J⁺
             end
         else
             a⁺, J⁺ = Plan(𝒫, b⁻, L-1)
@@ -32,7 +32,7 @@ function Plan(𝒫 :: POMDPscenario, b :: FullNormal, L :: Int)
         end
         
         if J < best.J
-            best = (a, J)
+            best = (a = a, J = J)
         end
     end
     return best

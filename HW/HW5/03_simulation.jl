@@ -5,9 +5,8 @@ using Plots
 using StatsPlots
 using Colors, ColorSchemes
 includet("./00_misc.jl")
-includet("./00_models.jl")
-includet("./00_plan.jl")
-includet("./00_real.jl")
+includet("./01_models.jl")
+includet("./02_plan.jl")
 
 function main()
     x_goal = [9,9]
@@ -33,7 +32,7 @@ function main()
                         ) 
 
     T = 15 #steps 
-    L = 15 #horrizon
+    L = 2 #horrizon
 
     #Simulation!
     μ0 = [0.0,0.0]
@@ -54,6 +53,8 @@ function main()
         if obs !== nothing
             b = UpdateBelief(𝒫, b⁻, obs.z, obs.r)
         end
+
+        println(a)
 
     end
 end
