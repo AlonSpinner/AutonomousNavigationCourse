@@ -9,12 +9,12 @@ includet("./01_models.jl")
 includet("./02_plan.jl")
 
 function main()
-    x_goal = [4,-9]
+    x_goal = [8,2.5]
     x_gt = [-0.5, -0.2] #initial
 
-    λ = 0
-    cost(b,a) = norm(b.μ-x_goal) - λ*det(b.Σ)
-    costₜ(b) = norm(b.μ-x_goal) - λ*det(b.Σ)
+    λ = 0.5
+    cost(b,a) = norm(b.μ-x_goal) + λ*det(b.Σ)
+    costₜ(b) = norm(b.μ-x_goal) + λ*det(b.Σ)
     beacons = OrderBeacons(LinRange(0,9,3), LinRange(0,9,3))
     rng = MersenneTwister(1)
     𝒫 = POMDPscenario(
@@ -31,13 +31,17 @@ function main()
                         costₜ = costₜ
                         ) 
 
-    T = 15 #steps 
-    L = 2 #horrizon
+    T = 10 #steps 
+    L = 4 #horrizon
 
     #Simulation!
     μ0 = [0.0,0.0]
     Σ0 = I₂
     b = MvNormal(μ0, Σ0)
+    collect_b = []
+    collect_x_gt = []
+    collect_a = []
+    collect_z = []
     for t in 1:T
         #plan
         a, J = Plan(𝒫, b, L)
@@ -56,10 +60,38 @@ function main()
             b = b⁻
         end
 
-        println(a, b.μ)
+        push!(collect_b, b)
+        push!(collect_x_gt, x_gt)
+        push!(collect_a, a)
+        if obs !== nothing
+            push!(collect_z, obs.z)
+        end
 
+        println("finished time step $t")
     end
+    
+    plt = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5),
+    title = "x_goal = $x_goal, L = $L", titlefont = font(10))
+    scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon, color = "yellow")
+    scatter!([x[1] for x in collect_x_gt], [x[2] for x in collect_x_gt], label="ground truth", color = "red")
+    scatter!([x.μ[1] for x in collect_b], [x.μ[2] for x in collect_b], label="belief", color = "blue", markersize = 2)
+    for i in 1:length(collect_b)
+        covellipse!(collect_b[i].μ, collect_b[i].Σ, n_std=3, label = "", color = "blue")
+    end
+    scatter!([x[1] for x in collect_z], [x[2] for x in collect_z], label="measurements", color = "cyan", markersize = 2)
+    scatter!([x_goal[1]], [x_goal[2]], label="goal",  markersize = 5, markershape = :star)
+
+    #QUIVER DESTROYS LEGEND
+    s = 0.5 #scale for quiver size
+    quiver!(plt, [x.μ[1] for x in collect_b],[x.μ[2] for x in collect_b], 
+    quiver = ([s*x[1] for x in collect_a],[s*x[2] for x in collect_a]),color = "black", label = "chosen actions")
+    
+    savefig(plt,"./out/Q1_2.pdf")
+
+    println("finished")
 end
 
 main()
+
+
 
