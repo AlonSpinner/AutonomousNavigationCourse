@@ -9,10 +9,10 @@ includet("./01_models.jl")
 includet("./02_plan.jl")
 
 function main()
-    x_goal = [8,2.5]
+    x_goal = [8,5]
     x_gt = [-0.5, -0.2] #initial
 
-    λ = 0.5
+    λ = 2000
     cost(b,a) = norm(b.μ-x_goal) + λ*det(b.Σ)
     costₜ(b) = norm(b.μ-x_goal) + λ*det(b.Σ)
     beacons = OrderBeacons(LinRange(0,9,3), LinRange(0,9,3))
@@ -32,13 +32,13 @@ function main()
                         ) 
 
     T = 10 #steps 
-    L = 4 #horrizon
+    L = 3 #horrizon
 
     #Simulation!
     μ0 = [0.0,0.0]
     Σ0 = I₂
     b = MvNormal(μ0, Σ0)
-    collect_b = []
+    collect_b = [b]
     collect_x_gt = []
     collect_a = []
     collect_z = []
@@ -71,7 +71,7 @@ function main()
     end
     
     plt = plot(; xlabel="x", ylabel="y", aspect_ratio = 1.0,  grid=:true, legend=:outertopright, legendfont=font(5),
-    title = "x_goal = $x_goal, L = $L", titlefont = font(10))
+    title = "x_goal = $x_goal, L = $L, λ = $λ", titlefont = font(10))
     scatter!(beacons[:,1], beacons[:,2], label="beacons", markershape = :hexagon, color = "yellow")
     scatter!([x[1] for x in collect_x_gt], [x[2] for x in collect_x_gt], label="ground truth", color = "red")
     scatter!([x.μ[1] for x in collect_b], [x.μ[2] for x in collect_b], label="belief", color = "blue", markersize = 2)
@@ -86,6 +86,7 @@ function main()
     quiver!(plt, [x.μ[1] for x in collect_b],[x.μ[2] for x in collect_b], 
     quiver = ([s*x[1] for x in collect_a],[s*x[2] for x in collect_a]),color = "black", label = "chosen actions")
     
+    display(plt)
     savefig(plt,"./out/Q1_2.pdf")
 
     println("finished")
