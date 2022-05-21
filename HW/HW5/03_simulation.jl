@@ -9,10 +9,10 @@ includet("./01_models.jl")
 includet("./02_plan.jl")
 
 function main()
-    x_goal = [8,5]
+    x_goal = [5,-5]
     x_gt = [-0.5, -0.2] #initial
 
-    λ = 2000
+    λ = 10000
     cost(b,a) = norm(b.μ-x_goal) + λ*det(b.Σ)
     costₜ(b) = norm(b.μ-x_goal) + λ*det(b.Σ)
     beacons = OrderBeacons(LinRange(0,9,3), LinRange(0,9,3))
