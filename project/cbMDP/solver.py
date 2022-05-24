@@ -122,21 +122,24 @@ class solver:
             self.seen_landmarks["classLabel"].append(lm.classLabel)
             self.initial_estimate.insert(L(lm.id), Li)
 
-    def plot(self,poses = True ,poses_axis_length = 0.1, poses_Cov = True, 
+    def plot(self,poses = True ,poses_axis_length = 0.1, poses_Cov = True, landmark_Cov = True,
                   landmarks = True, landmarks_Index = False, landmarks_Semantics = False,
                   bestEstimate = False):
         
         current_estimate = self.calculateEstimate(bestEstimate = bestEstimate)
-        marginals = gtsam.Marginals(self.graph, current_estimate)
+
+        if landmark_Cov or poses_Cov:
+            marginals = gtsam.Marginals(self.graph, current_estimate)
+        else:
+            marginals = False
 
         #wrapper function for plot_poses and plot_landmarks so we wont compute current_estimate and marginals twice
 
         if poses:
-            self.plot_poses(current_estimate, marginals,
-                            axis_length = poses_axis_length, 
-                            plotCov = poses_Cov)
+            self.plot_poses(current_estimate, landmark_Cov and marginals, #and returns second argument if both are true
+                            axis_length = poses_axis_length)
         if landmarks:
-            self.plot_landmarks(current_estimate, marginals,
+            self.plot_landmarks(current_estimate, poses_Cov and marginals, #and returns second argument if both are true
                                     plotIndex = landmarks_Index, 
                                     plotSemantics = landmarks_Semantics)
 
@@ -163,13 +166,18 @@ class solver:
                 markerShape = '.' #default
 
             #plot
-            cov = marginals.marginalCovariance(L(seen_lm_index))
             loc = current_estimate.atPoint2(L(seen_lm_index))
-            self.graphics_landmarks.append(plotting.plot_landmark(self.ax, loc = loc, cov = cov,
-                markerColor = 'b', markerShape = markerShape, markerSize = 3,
-                index = index4plot, textColor = 'b'))
+            if marginals:
+                cov = marginals.marginalCovariance(L(seen_lm_index))     
+                self.graphics_landmarks.append(plotting.plot_landmark(self.ax, loc = loc, cov = cov,
+                    markerColor = 'b', markerShape = markerShape, markerSize = 3,
+                    index = index4plot, textColor = 'b'))
+            else:
+                self.graphics_landmarks.append(plotting.plot_landmark(self.ax, loc = loc,
+                    markerColor = 'b', markerShape = markerShape, markerSize = 3,
+                    index = index4plot, textColor = 'b'))
 
-    def plot_poses(self, current_estimate, marginals, axis_length = 0.1, plotCov = True):
+    def plot_poses(self, current_estimate, marginals, axis_length = 0.1):
         if self.ax is None:
             raise Exception("you must provide an axes handle to solver if you want to plot")
 
@@ -181,8 +189,11 @@ class solver:
         self.graphics_poses = []
         ii = 0
         while current_estimate.exists(X(ii)):
-            cov = marginals.marginalCovariance(X(ii)) if plotCov is True else None
             pose = current_estimate.atPose2(X(ii))
-
-            self.graphics_poses.append(plotting.plot_pose(self.ax, pose, axis_length = axis_length, covariance = cov))
+            if marginals:
+                cov = marginals.marginalCovariance(X(ii))
+                self.graphics_poses.append(plotting.plot_pose(self.ax, pose, axis_length = axis_length, covariance = cov))
+            else:
+                self.graphics_poses.append(plotting.plot_pose(self.ax, pose, axis_length = axis_length))
+            
             ii +=1

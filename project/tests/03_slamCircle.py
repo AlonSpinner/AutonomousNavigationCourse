@@ -72,6 +72,6 @@ with plt.ion():
         graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1])
         graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
-        plt.pause(0.1)
+        plt.pause(0.5)
 
 plt.show()
