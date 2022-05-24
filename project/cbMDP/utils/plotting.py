@@ -108,3 +108,14 @@ def spawnWorld(xrange = None, yrange = None,type = "world"):
         ax2.grid()
 
         return fig, (ax1,ax2)
+
+def plot_goals(axes : plt.Axes, goals : np.ndarray, index = True,
+        markerShape = '+', markerColor = 'k', markerSize = 100, textColor = 'k', fontsize = 20):
+    
+    for i,g in enumerate(goals):
+        graphics = []
+        graphics.append(axes.scatter(g[0],g[1], marker = markerShape, c = markerColor, s = markerSize))
+        if index:
+            graphics.append(axes.text(g[0],g[1],i, color = textColor, fontsize = fontsize))
+
+    return graphics
