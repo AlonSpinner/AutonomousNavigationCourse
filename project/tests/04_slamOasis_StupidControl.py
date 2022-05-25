@@ -48,12 +48,14 @@ plotting.plot_goals(ax, goals)
 backend = solver(ax = ax,X0 = car.pose ,X0cov = car.odometry_noise/1000, semantics = worldMap.exportSemantics())
 
 #init history loggers
-hist_GT = car.pose.translation()
+hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
 
 # set graphics
 graphic_GT_traj, = plt.plot([], [],'ko-',markersize = 1)
+graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
 
 # #run and plot simulation
+xcurrent_DR = car.pose
 targetIndex = 0
 with plt.ion():
     for k in range(0,1000):
@@ -79,13 +81,18 @@ with plt.ion():
             backend.addlandmarkMeasurement(meas_lm)
         backend.update(N=0)
         
+        #dead reckoning integration
+        xcurrent_DR = xcurrent_DR.compose(meas_odom.dpose)
+
         #log history
         hist_GT = np.vstack([hist_GT,car.pose.translation()])
+        hist_DR = np.vstack([hist_DR,xcurrent_DR.translation()])
 
         #plot
         car.plot(markerSize = 10)
         backend.plot()
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
+        # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
         plt.pause(0.3)
 
