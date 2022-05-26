@@ -9,9 +9,6 @@ from cbMDP.robot import robot
 from cbMDP.map import map
 from cbMDP.planner import planner
 
-from copy import deepcopy
-
-
 def scenario():
     np.random.seed(seed=2)
 
@@ -47,7 +44,7 @@ car, worldMap, ax, fig, goals, targetRangeSwitch, dx = scenario()
 
 #init estimator and controller
 backend = solver(ax = ax,X0 = car.pose ,X0cov = car.odometry_noise/1000, semantics = worldMap.exportSemantics())
-controller = planner(car_dx = dx)
+controller = planner(car_dx = dx, cov_w = car.odometry_noise, cov_v = car.rgbd_noise)
 u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init history loggers
@@ -72,7 +69,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        u = controller(deepcopy(backend), u ,goals[targetIndex]) #use previous u as initial condition
+        u = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
         odom_cmd = gtsam.Pose2(dx,0,u)        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)

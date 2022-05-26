@@ -6,6 +6,8 @@ from .utils.datatypes import meas_odom
 from .utils.datatypes import landmark
 from .utils import plotting
 
+from copy import deepcopy
+
 class solver:
     
     def __init__(self,X0 = None,X0cov = None, semantics = None ,ax = None):
@@ -24,7 +26,7 @@ class solver:
         self.graph.push_back(gtsam.PriorFactorPose2(X(0), X0, X0_prior_noise))
 
         #initalize solver isam2
-        self.isam2Initalize()
+        self.isam2Initalize() #sets self.isam2
         self.update()
 
         #time index
@@ -197,3 +199,21 @@ class solver:
                 self.graphics_poses.append(plotting.plot_pose(self.ax, pose, axis_length = axis_length))
             
             ii +=1
+
+    def copyObject(self):
+        #cant deepcopy regullarly as isam2 is not pickelable (dafaq) 
+        copySolver = solver()
+
+        copySolver.graph = deepcopy(self.graph)
+        copySolver.initial_estimate = deepcopy(self.initial_estimate)
+        copySolver.isam2 = self.isam2 #is imutable !
+        copySolver.i = deepcopy(self.i)
+        copySolver.seen_landmarks = deepcopy(self.seen_landmarks)
+
+        # -------------------dont require these for computations
+        # copySolver.semantics = deepcopy(self.semantics)
+        # copySolver.ax = deepcopy(self.ax)
+        # copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
+        # copySolver.graphics_poses = deepcopy(self.graphics_poses)
+
+        return copySolver
