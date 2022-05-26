@@ -6,7 +6,7 @@ from .utils.datatypes import meas_odom
 from .utils.datatypes import landmark
 from .utils import plotting
 
-from copy import deepcopy
+from copy import deepcopy, copy
 
 class solver:
     
@@ -206,7 +206,7 @@ class solver:
 
         copySolver.graph = deepcopy(self.graph)
         copySolver.initial_estimate = deepcopy(self.initial_estimate)
-        copySolver.isam2 = self.isam2 #is imutable !
+        copySolver.isam2 = self.isam2 #is mutable !
         copySolver.i = deepcopy(self.i)
         copySolver.seen_landmarks = deepcopy(self.seen_landmarks)
 
@@ -215,5 +215,5 @@ class solver:
         # copySolver.ax = deepcopy(self.ax)
         # copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
         # copySolver.graphics_poses = deepcopy(self.graphics_poses)
-
+        gtsam.isam2
         return copySolver

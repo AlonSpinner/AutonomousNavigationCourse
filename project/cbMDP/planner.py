@@ -90,7 +90,8 @@ class planner():
             
             X_kpl = backend.isam2.calculateEstimatePose2(X(backend.i))
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
-            backend.addlandmarkMeasurement(lms)
+            if lms:
+                backend.addlandmarkMeasurement(lms)
             backend.update()
 
             covs.append(backend.isam2.marginalCovariance(X(backend.i))) #i == k
