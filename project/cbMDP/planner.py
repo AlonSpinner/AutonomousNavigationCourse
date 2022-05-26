@@ -6,22 +6,20 @@ import gtsam
 from gtsam.symbol_shorthand import L, X
 
 import numpy as np
-from numpy.linalg import inv
 from numpy import trace
 
 class planner():
 
-    def __init__(self):
+    def __init__(self,car_dx):
         self.simCar : robot = robot()
-        self.car_dx = 0 #for u -> Pose2(car_dx,0,u) in innerLayer
+        self.car_dx = car_dx #for u -> Pose2(car_dx,0,u) in innerLayer
         self.eps = 0.001
-        self.beta = 0
-        self.alpha_LB = 0
-        self.alpha_km1 = 0
+        self.beta = 5 #[m^2]
+        self.alpha_LB = 0.2 #Not stated in article
+        self.alpha_km1 = self.alpha_LB #initalizaton. Just go towards goal <-> low alpha
         self.M_u = 0.1 #weight matrix for u, page 21
-        self.lambDa = 0 #stepsize for gradient decent
-        self.alpha_km1 = 0 #required to compute 
-        self.i_max = 10 #maximum number of iterations for graident decent
+        self.lambDa = 0.1 #stepsize for gradient decent. Not stated in article
+        self.i_max = 100 #maximum number of iterations for graident decent
     
     def outerLayer(self,backend,u0,goal): #plan
         J, J_prev = 0, 0
@@ -101,4 +99,4 @@ def mahalanobisISqrd(a : np.ndarray ,S : np.ndarray):
 
 def zeta(u) -> float:
     #bottom of page 18 - some known function that quantifies the usage of control u
-    return u**2
+    return u**2 # penalizes changes in direciton, page 45 

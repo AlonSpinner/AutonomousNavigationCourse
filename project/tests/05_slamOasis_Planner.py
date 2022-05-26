@@ -3,11 +3,13 @@ import matplotlib.pyplot as plt
 import gtsam
 from gtsam.symbol_shorthand import L, X
 
-
 import cbMDP.utils.plotting as plotting
 from cbMDP.solver import solver
 from cbMDP.robot import robot
 from cbMDP.map import map
+from cbMDP.planner import planner
+
+from copy import deepcopy
 
 
 def scenario():
@@ -28,7 +30,7 @@ def scenario():
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
     car = robot(ax = ax, pose = pose0, FOV = np.radians(90), range = 2)
-    dx = 1.0
+    dx = 1.0 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -43,8 +45,10 @@ def scenario():
 
 car, worldMap, ax, fig, goals, targetRangeSwitch, dx = scenario()
 
-#init estimator
+#init estimator and controller
 backend = solver(ax = ax,X0 = car.pose ,X0cov = car.odometry_noise/1000, semantics = worldMap.exportSemantics())
+controller = planner(car_dx = dx)
+u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init history loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
@@ -68,10 +72,8 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        belief = backend.calculateEstimate().atPose2(X(k))
-        err = belief.bearing(goals[targetIndex]).theta()
-        theta_cmd = np.sign(err)  * min(abs(err), np.pi/4)
-        odom_cmd = gtsam.Pose2(dx,0,theta_cmd)
+        u = controller(deepcopy(backend), u ,goals[targetIndex]) #use previous u as initial condition
+        odom_cmd = gtsam.Pose2(dx,0,u)        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
