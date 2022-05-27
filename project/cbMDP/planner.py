@@ -11,14 +11,14 @@ from numpy import trace
 class planner():
 
     def __init__(self, r_dx : float, r_cov_w : np.ndarray, r_cov_v : np.ndarray, r_range : float, r_FOV : float):
-        self.epsConv : float = 0.01
-        self.epsGrad : float = 1e-10
-        self.beta : float = 1 #[m^2]
+        self.epsConv : float = 0.001
+        self.epsGrad : float = 1e-3
+        self.beta : float = 0.5 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1  : float = self.alpha_LB #initalizaton. Just go towards goal <-> low alpha
         self.M_u = 0.1 #weight matrix for u, page 21
-        self.lambDa : float = 0.01 #stepsize for gradient decent. Not stated in article
-        self.i_max : int = 4 #maximum number of iterations for graident decent
+        self.lambDa : float = 0.01 #larger number allows for bigger turns
+        self.i_max : int = 10 #maximum number of iterations for graident decent
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
         self.cov_v : np.ndarray = r_cov_v
@@ -31,7 +31,7 @@ class planner():
 
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        alpha_k = min(trace(cov_kpL_bar)/self.beta, 1)
+        alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
         if self.alpha_km1 == 1 and alpha_k > self.alpha_LB: #alpha_k ~ 1 when uncertinity is high
             alpha_k = 1
         M_x = (1-alpha_k) * np.eye(2)
@@ -45,9 +45,14 @@ class planner():
 
             #check convergence
             J = self.evaluateObjective(backend.copyObject(), u, M_x, M_sigma, goal)
-            if np.linalg.norm(dJ) < self.epsConv or \
-                np.linalg.norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv or \
-                i > self.i_max:
+            if np.linalg.norm(dJ) < self.epsConv:
+                print('small graident')
+                return u
+            if np.linalg.norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
+                print('small change in J')
+                return u
+            if i > self.i_max:
+                print('max iterations for gradient decent')
                 return u
             
             i += 1
@@ -74,12 +79,14 @@ class planner():
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
             b += M_sigma**2 * trace(cov)
+            # print(M_sigma)
 
         c = mahalanobisIsqrd(est.translation()-goal,M_x)
 
         #currently skipping third term from equation 41, even though it rewards loop closure
 
         J = a + b + c
+        print(b/J)
         return J
 
     def innerLayer4alpha(self, backend : solver ,u : np.ndarray):
@@ -122,7 +129,7 @@ class planner():
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
                 # if abs(angle) < self.FOV/2 and (r < self.range): #if viewed, compute noisy measurement
-                cov_v_bar = self.cov_v * min(1,r/self.range)**2
+                cov_v_bar = self.cov_v * max(1,r/self.range)**4
                 meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 

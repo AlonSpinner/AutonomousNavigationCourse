@@ -16,18 +16,19 @@ def scenario():
     xrange = (-10,20); yrange = (-10,20)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
+    N = 4
     worldMap = map()
-    worldMap.fillMapRandomly(10,["rose"],(2,6),(5,7))
-    worldMap.fillMapRandomly(10,["lily"],(2,8),(15,18))
-    worldMap.fillMapRandomly(10,["hydrangea"],(14,17),(17,19))
-    worldMap.fillMapRandomly(10,["tulip"],(17,19),(-2,2))
-    worldMap.fillMapRandomly(10,["orchid"],(10,12),(-7,-9))
-    worldMap.fillMapRandomly(10,["peony"],(-8,-6),(-2,-4))
+    worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
+    worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
+    worldMap.fillMapRandomly(N,["hydrangea"],(14,17),(17,19))
+    worldMap.fillMapRandomly(N,["tulip"],(17,19),(-2,2))
+    worldMap.fillMapRandomly(N,["orchid"],(10,12),(-7,-9))
+    worldMap.fillMapRandomly(N,["peony"],(-8,-6),(-2,-4))
 
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
-    car = robot(ax = ax, pose = pose0, FOV = np.radians(90), range = 2)
-    dx = 1.0 #how much the robot goes forward in each timestep
+    car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
+    dx = 1.3 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -36,7 +37,7 @@ def scenario():
                         [18,0],
                         [11,-8],
                         [-7,-3]])
-    targetRangeSwitch = 2.0
+    targetRangeSwitch = 2
 
     return car, worldMap, ax, fig, goals, targetRangeSwitch, dx
 
@@ -51,25 +52,27 @@ controller = planner(r_dx = dx,
                     r_range = car.range, r_FOV = car.FOV)
 u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
-#init history loggers
+#init loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
+targetIndex = 0
 
 # set graphics
 worldMap.plot(ax = ax, plotIndex = False, plotCov = False)
 plotting.plot_goals(ax, goals)
 graphic_GT_traj, = plt.plot([], [],'ko-',markersize = 1)
 graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
+graphic_Plan_traj, = plt.plot([], [],'go-',markersize = 1)
+ax.set_title(f'target: {targetIndex}')
 
 # run and plot simulation
 xcurrent_DR = car.pose
-targetIndex = 0
 with plt.ion():
     for k in range(0,1000):
 
         #switch target if reached previous
         if np.linalg.norm(car.pose.translation() - goals[targetIndex]) < targetRangeSwitch:
                 targetIndex += 1
-                print(f"next goal: {targetIndex}")
+                ax.set_title(f'target: {targetIndex}')
         if targetIndex == len(goals):
                 break #reached last goal
 
@@ -98,6 +101,13 @@ with plt.ion():
         backend.plot()
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
+        plan = np.zeros((1+u.size,2))
+        belief = backend.isam2.calculateEstimatePose2(X(backend.i))
+        plan[0,:] = np.array(belief.translation())
+        for i,ui in enumerate(u):
+            belief = belief.compose(gtsam.Pose2((dx,0,ui)))
+            plan[1+i,:] = np.array(belief.translation())
+        graphic_Plan_traj.set_data(plan[:,0],plan[:,1])
         
         plt.pause(0.01)
 
