@@ -200,7 +200,7 @@ class solver:
             
             ii +=1
 
-    def copyObject(self):
+    def copyObject(self, full = False):
         #cant deepcopy regullarly as isam2 is not pickelable (dafaq) 
         copySolver = solver()
 
@@ -210,10 +210,12 @@ class solver:
         copySolver.i = deepcopy(self.i)
         copySolver.seen_landmarks = deepcopy(self.seen_landmarks)
 
-        # -------------------dont require these for computations
-        # copySolver.semantics = deepcopy(self.semantics)
-        # copySolver.ax = deepcopy(self.ax)
-        # copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
-        # copySolver.graphics_poses = deepcopy(self.graphics_poses)
-        gtsam.isam2
+        copySolver.isam2 = gtsam.ISAM2(self.isam2.params()) #reinitalize Isam2
+        copySolver.isam2.update(self.graph, self.calculateEstimate()) #first update with global solver
+
+        if full:# -------------------dont require these for computations
+            copySolver.semantics = deepcopy(self.semantics)
+            copySolver.ax = deepcopy(self.ax)
+            copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
+            copySolver.graphics_poses = deepcopy(self.graphics_poses)
         return copySolver

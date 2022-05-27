@@ -87,7 +87,8 @@ class planner():
             backend.i += 1
 
             backend.addOdomMeasurement(meas_odom(gtsam.Pose2(self.car_dx,0,u_kpl),self.cov_w))
-            
+            backend.update() #need to update to pull X_kpl for landmark measurements
+
             X_kpl = backend.isam2.calculateEstimatePose2(X(backend.i))
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
             if lms:
