@@ -63,11 +63,11 @@ class planner():
             J += self.M_u * zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
 
         for l, u_kpl in enumerate(u):
-            est,cov = self.innerLayer(backend,[u_kpl])
+            est,cov = self.innerLayer(backend,np.array([u_kpl]))
             J += M_sigma**2 * trace(cov)
             #currently skipping third term from equation 41, even though it rewards loop closure
 
-        J += mahalanobisIsqrd(est-goal,M_x)
+        J += mahalanobisIsqrd(est.translation()-goal,M_x)
 
         return J
 
@@ -91,21 +91,25 @@ class planner():
 
             X_kpl = backend.isam2.calculateEstimatePose2(X(backend.i))
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
-            if lms:
-                backend.addlandmarkMeasurement(lms)
+            for lm in lms:
+                backend.addlandmarkMeasurement(lm)
             backend.update()
 
             covs.append(backend.isam2.marginalCovariance(X(backend.i))) #i == k
             ests.append(backend.isam2.calculateEstimatePose2(X(backend.i)))
         
+        if u.size == 1:
+            ests = ests[0]
+            covs = covs[0]
+
         return ests,covs
 
     def simulateMeasuringLandmarks(self, backend : solver, pose : gtsam.Pose2):
             meas = []
             for lm_index, lm_label in zip(backend.seen_landmarks["id"], backend.seen_landmarks["classLabel"]):
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))         
-                angle = self.pose.bearing(lmML.xy).theta()
-                r = self.pose.range(lmML.xy)
+                angle = pose.bearing(lmML).theta()
+                r = pose.range(lmML)
                 meas.append(meas_landmark(lm_index, r, angle, self.cov_v, lm_label))
             return meas
 

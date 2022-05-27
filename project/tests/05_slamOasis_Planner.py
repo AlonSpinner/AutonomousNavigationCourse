@@ -70,7 +70,7 @@ with plt.ion():
 
         #Controller
         u = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
-        odom_cmd = gtsam.Pose2(dx,0,u)        
+        odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
