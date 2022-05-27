@@ -7,24 +7,26 @@ from gtsam.symbol_shorthand import L, X
 
 import numpy as np
 from numpy import trace
+import matplotlib.pyplot as plt
 
 class planner():
 
-    def __init__(self, r_dx : float, r_cov_w : np.ndarray, r_cov_v : np.ndarray, r_range : float, r_FOV : float):
-        self.epsConv : float = 0.001
-        self.epsGrad : float = 1e-3
+    def __init__(self, r_dx : float, r_cov_w : np.ndarray, \
+                    r_cov_v : np.ndarray, r_range : float, r_FOV : float, axes : plt.Axes = None):
+        self.epsConv : float = 1e-7
+        self.epsGrad : float = 1e-10
         self.beta : float = 0.5 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
-        self.alpha_km1  : float = self.alpha_LB #initalizaton. Just go towards goal <-> low alpha
         self.M_u = 0.1 #weight matrix for u, page 21
-        self.lambDa : float = 0.03 #larger number allows for bigger turns
+        self.lambDa : float = 0.1 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
         self.cov_v : np.ndarray = r_cov_v
         self.range : float = r_range
         self.FOV : float = r_FOV
-    
+        self.axes = axes
+        self.graphic_plan = [] #placeholder
     def outerLayer(self,backend : solver ,u : np.ndarray ,goal : np.ndarray): #plan
         J_prev = 1e10 #absurdly big number as initial value
         i = 0
@@ -32,28 +34,27 @@ class planner():
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
-        if self.alpha_km1 == 1 and alpha_k > self.alpha_LB: #alpha_k ~ 1 when uncertinity is high
-            alpha_k = 1
-        M_x = (1-alpha_k) * np.eye(2)
+        print(alpha_k)
+        M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)
-        self.alpha_km1 = alpha_k #update alpha_km1 for next planning session
 
         while True:
             #update u
             dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
             u = u - self.lambDa * dJ
+            # u[u > np.pi/4] = np.pi/4
 
             #check convergence
             J = self.evaluateObjective(backend.copyObject(), u, M_x, M_sigma, goal)
             if np.linalg.norm(dJ) < self.epsConv:
                 print('small graident')
-                return u
+                return u, J
             if np.linalg.norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
                 print('small change in J')
-                return u
+                return u, J
             if i > self.i_max:
                 print('max iterations for gradient decent')
-                return u
+                return u, J
             
             i += 1
             J_prev = J
@@ -73,7 +74,7 @@ class planner():
         #M_u and L provided from self
         a = 0
         for u_kpl in u:
-            a += self.M_u * zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
+            a += zeta(u_kpl)**2 * self.M_u # mahalanobisISqrd doesnt work for scalars.. so...
 
         b = 0
         ests = []
@@ -84,14 +85,13 @@ class planner():
             ests.append(est)
             # print(M_sigma)
 
-        d = np.linalg.norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
-        c = min(d) * M_x[0,0]
-        # c = mahalanobisIsqrd(est.translation()-goal,M_x)
+        #use this formulation as we have no control on "gas" only on "wheel"
+        dist = np.linalg.norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
+        c = M_x * min(dist)
 
         #currently skipping third term from equation 41, even though it rewards loop closure
-
+        
         J = a + b + c
-        print(b/J)
         return J
 
     def innerLayer4alpha(self, backend : solver ,u : np.ndarray):
@@ -140,6 +140,23 @@ class planner():
 
         #create list of landmarks
 
+    def plotPlan(self,u, backend, axes : plt.Axes):
+        if ax is None:
+            try: 
+                ax = self.axes
+            except:
+                print('no axes provided to object')
+
+        if self.graphic_plan:
+            plan = np.zeros((1+u.size,2))
+            belief = backend.isam2.calculateEstimatePose2(X(backend.i))
+            plan[0,:] = np.array(belief.translation())
+            for i,ui in enumerate(u):
+                belief = belief.compose(gtsam.Pose2((self.dx,0,ui)))
+                plan[1+i,:] = np.array(belief.translation())
+            self.graphic_plan.set_data(plan[:,0],plan[:,1])
+        else:
+            self.graphic_plan = ax.plot([], [],'go-',markersize = 1)
 
 def mahalanobisIsqrd(a : np.ndarray ,S : np.ndarray):
     return a.T @ S @ a

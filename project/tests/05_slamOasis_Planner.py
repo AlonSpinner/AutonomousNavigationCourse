@@ -9,11 +9,13 @@ from cbMDP.robot import robot
 from cbMDP.map import map
 from cbMDP.planner import planner
 
+from copy import deepcopy
+
 def scenario():
     np.random.seed(seed=2)
 
     #------Build worldmap
-    xrange = (-10,20); yrange = (-10,20)
+    xrange = (-10,30); yrange = (-10,30)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
     N = 4
@@ -28,7 +30,7 @@ def scenario():
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
     car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
-    dx = 1.3 #how much the robot goes forward in each timestep
+    dx = 1 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -64,6 +66,13 @@ graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
 graphic_Plan_traj, = plt.plot([], [],'go-',markersize = 1)
 ax.set_title(f'target: {targetIndex}')
 
+u0 = np.zeros(10)
+u1, u2, u3 = u0, u0, u0
+u1[0] = np.pi/2
+u2[0] = np.pi
+u3[0] = 3*np.pi/2
+usets = [u0,u1,u2,u3]
+
 # run and plot simulation
 xcurrent_DR = car.pose
 with plt.ion():
@@ -77,7 +86,12 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        u = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
+        # uopts = []; Jopts = []
+        # for ui in deepcopy(usets):
+        u, J = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
+        # print(np.argmin(np.array(Jopts)))
+        # u = uopts[np.argmin(np.array(Jopts))]
+        # print(u)
         odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
