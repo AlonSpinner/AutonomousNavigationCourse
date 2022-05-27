@@ -17,7 +17,7 @@ class planner():
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1  : float = self.alpha_LB #initalizaton. Just go towards goal <-> low alpha
         self.M_u = 0.1 #weight matrix for u, page 21
-        self.lambDa : float = 0.01 #larger number allows for bigger turns
+        self.lambDa : float = 0.03 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
@@ -76,12 +76,17 @@ class planner():
             a += self.M_u * zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
 
         b = 0
+        ests = []
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
             b += M_sigma**2 * trace(cov)
+
+            ests.append(est)
             # print(M_sigma)
 
-        c = mahalanobisIsqrd(est.translation()-goal,M_x)
+        d = np.linalg.norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
+        c = min(d) * M_x[0,0]
+        # c = mahalanobisIsqrd(est.translation()-goal,M_x)
 
         #currently skipping third term from equation 41, even though it rewards loop closure
 
@@ -129,7 +134,7 @@ class planner():
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
                 # if abs(angle) < self.FOV/2 and (r < self.range): #if viewed, compute noisy measurement
-                cov_v_bar = self.cov_v * max(1,r/self.range)**4
+                cov_v_bar = self.cov_v * max(1,r/self.range)
                 meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
