@@ -11,13 +11,14 @@ from numpy import trace
 class planner():
 
     def __init__(self, r_dx : float, r_cov_w : np.ndarray, r_cov_v : np.ndarray, r_range : float, r_FOV : float):
-        self.eps : float = 0.01
-        self.beta : float = 2 #[m^2]
+        self.epsConv : float = 0.01
+        self.epsGrad : float = 1e-10
+        self.beta : float = 1 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1  : float = self.alpha_LB #initalizaton. Just go towards goal <-> low alpha
-        self.M_u = 0 #weight matrix for u, page 21
-        self.lambDa : float = 0.001 #stepsize for gradient decent. Not stated in article
-        self.i_max : int = 3000 #maximum number of iterations for graident decent
+        self.M_u = 0.1 #weight matrix for u, page 21
+        self.lambDa : float = 0.01 #stepsize for gradient decent. Not stated in article
+        self.i_max : int = 4 #maximum number of iterations for graident decent
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
         self.cov_v : np.ndarray = r_cov_v
@@ -25,7 +26,7 @@ class planner():
         self.FOV : float = r_FOV
     
     def outerLayer(self,backend : solver ,u : np.ndarray ,goal : np.ndarray): #plan
-        J_prev = np.inf
+        J_prev = 1e10 #absurdly big number as initial value
         i = 0
 
         #set weight matrices
@@ -39,28 +40,28 @@ class planner():
 
         while True:
             #update u
-            J = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
-            u = u - self.lambDa * J
+            dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
+            u = u - self.lambDa * dJ
 
             #check convergence
-            if np.linalg.norm(J) < self.eps or np.linalg.norm((J-J_prev)/(J_prev + self.eps)) < self.eps or i > self.i_max:
-                if i > self.i_max:
-                    print('max iterations reached')
+            J = self.evaluateObjective(backend.copyObject(), u, M_x, M_sigma, goal)
+            if np.linalg.norm(dJ) < self.epsConv or \
+                np.linalg.norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv or \
+                i > self.i_max:
                 return u
             
             i += 1
-            print(i)
             J_prev = J
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
-        J = self.evaluateObjective(backend.copyObject(), u, M_x, M_sigma, goal)
         dJ = np.zeros(u.size)
         for i in range(u.size):
             du = np.zeros_like(u)
-            du[i] = self.eps
-            Ji = self.evaluateObjective(backend.copyObject(),u + du ,M_x, M_sigma, goal)
-            dJ[i] = (Ji-J)/self.eps
+            du[i] = self.epsGrad
+            Jpi = self.evaluateObjective(backend.copyObject(),u + du ,M_x, M_sigma, goal)
+            Jmi = self.evaluateObjective(backend.copyObject(),u - du ,M_x, M_sigma, goal)
+            dJ[i] = (Jpi-Jmi)/(2 * self.epsGrad)
         return dJ
 
     def evaluateObjective(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> float:
@@ -73,9 +74,10 @@ class planner():
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
             b += M_sigma**2 * trace(cov)
-            #currently skipping third term from equation 41, even though it rewards loop closure
 
         c = mahalanobisIsqrd(est.translation()-goal,M_x)
+
+        #currently skipping third term from equation 41, even though it rewards loop closure
 
         J = a + b + c
         return J
