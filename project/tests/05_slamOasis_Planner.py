@@ -36,15 +36,19 @@ def scenario():
                         [18,0],
                         [11,-8],
                         [-7,-3]])
-    targetRangeSwitch = 1.0
+    targetRangeSwitch = 2.0
 
     return car, worldMap, ax, fig, goals, targetRangeSwitch, dx
 
 car, worldMap, ax, fig, goals, targetRangeSwitch, dx = scenario()
 
 #init estimator and controller
-backend = solver(ax = ax,X0 = car.pose ,X0cov = car.odometry_noise/1000, semantics = worldMap.exportSemantics())
-controller = planner(car_dx = dx, cov_w = car.odometry_noise, cov_v = car.rgbd_noise)
+backend = solver(ax = ax, 
+                X0 = car.pose ,X0cov = car.odometry_noise/1000, 
+                semantics = worldMap.exportSemantics())
+controller = planner(r_dx = dx, 
+                    r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
+                    r_range = car.range, r_FOV = car.FOV)
 u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init history loggers
@@ -65,6 +69,7 @@ with plt.ion():
         #switch target if reached previous
         if np.linalg.norm(car.pose.translation() - goals[targetIndex]) < targetRangeSwitch:
                 targetIndex += 1
+                print(f"next goal: {targetIndex}")
         if targetIndex == len(goals):
                 break #reached last goal
 
@@ -94,6 +99,6 @@ with plt.ion():
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
-        plt.pause(0.3)
+        plt.pause(0.01)
 
 plt.show()
