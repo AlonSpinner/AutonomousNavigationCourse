@@ -17,9 +17,9 @@ class planner():
         self.k : int = 0 #time step
         #"converger"
         self.epsConvGrad : float = 1e-5
-        self.epsConvVal : float = 1e-3
+        self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.005 #larger number allows for bigger turns
+        self.lambDa : float = 0.1 #larger number allows for bigger turns
         self.i_max : int = 100 #maximum number of iterations for graident decent
         #weighting
         self.beta : float = 0.45 #[m^2]
@@ -41,7 +41,7 @@ class planner():
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
-        alpha_k = 0
+        alpha_k = 0.1
         print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
         M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)
@@ -57,7 +57,7 @@ class planner():
             plannedBackend = backend.copyObject()
             J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
             if norm(dJ) < self.epsConvGrad:
-                print('small graident')
+                print('small dJ')
                 return u, J, plannedBackend
             if norm((J-J_prev)/(J_prev + self.epsConvVal)) < self.epsConvVal:
                 print('small change in J')

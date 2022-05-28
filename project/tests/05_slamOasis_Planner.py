@@ -10,7 +10,7 @@ from cbMDP.map import map
 from cbMDP.planner import planner, stupidController
 
 def scenario():
-    np.random.seed(seed=2)
+    np.random.seed(seed=1)
 
     #------Build worldmap
     xrange = (-10,30); yrange = (-10,30)
@@ -27,7 +27,7 @@ def scenario():
 
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
-    car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
+    car = robot(ax = ax, pose = pose0, FOV = np.radians(120), range = 2)
     dx = 1 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
