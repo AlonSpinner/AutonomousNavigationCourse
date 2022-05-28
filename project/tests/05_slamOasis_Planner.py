@@ -22,7 +22,7 @@ def scenario():
     worldMap = map()
     worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
-    worldMap.fillMapRandomly(N,["hydrangea"],(14,17),(17,19))
+    worldMap.fillMapRandomly(N,["hydrangea"],(12,15),(17,19))
     worldMap.fillMapRandomly(N,["tulip"],(17,19),(-2,2))
     worldMap.fillMapRandomly(N,["orchid"],(10,12),(-7,-9))
     worldMap.fillMapRandomly(N,["peony"],(-8,-6),(-2,-4))
@@ -30,12 +30,12 @@ def scenario():
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
     car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
-    dx = 2 #how much the robot goes forward in each timestep
+    dx = 1 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
                         [4,17],
-                        [16,18],
+                        [14,18],
                         [18,0],
                         [11,-8],
                         [-7,-3]])
@@ -52,7 +52,7 @@ backend = solver(ax = ax,
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
                     r_range = car.range, r_FOV = car.FOV, ax = ax)
-u0 = np.zeros(5) #initial guess for action. Determines horizon aswell
+u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
@@ -79,7 +79,8 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
+        # u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
+        u = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
         odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)

@@ -10,6 +10,8 @@ from numpy import trace
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
 
+from scipy.optimize import minimize
+
 class planner():
 
     def __init__(self, r_dx : float, r_cov_w : np.ndarray, \
@@ -18,10 +20,10 @@ class planner():
         #"converger"
         self.epsConv : float = 1e-5
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.005 #larger number allows for bigger turns
+        self.lambDa : float = 0.01 #larger number allows for bigger turns
         self.i_max : int = 100 #maximum number of iterations for graident decent
         #weighting
-        self.beta : float = 0.45 #[m^2]
+        self.beta : float = 0.4 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
         #robot simulation
@@ -41,10 +43,21 @@ class planner():
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
         print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
+        # alpha_k = 0
         M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)
 
+        def f(u):
+            return self.evaluateObjective(backend.copyObject(), u, M_x, M_sigma, goal)
+        def df(u):
+            return self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
+        res = minimize(f, u, jac = df, options = {"maxiter" : 5}, method = "Newton-CG")
+        return res.x
+
         while True:
+
+            
+
             #update u
             dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
             u = u - self.lambDa * dJ
@@ -146,7 +159,7 @@ class planner():
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
                 # if abs(angle) < self.FOV/2 and (r < self.range): #if viewed, compute noisy measurement
-                cov_v_bar = self.cov_v * max(1,r/self.range)
+                cov_v_bar = self.cov_v * max(1,(r/self.range)**2)
                 meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
