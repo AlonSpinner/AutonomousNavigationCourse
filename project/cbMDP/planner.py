@@ -17,15 +17,15 @@ class planner():
         self.k : int = 0 #time step
         #"converger"
         self.epsConvGrad : float = 1e-5
-        self.epsConvVal : float = 1e-4
+        self.epsConvVal : float = 1e-6
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.1 #larger number allows for bigger turns
+        self.lambDa : float = 0.8 #larger number allows for bigger turns
         self.i_max : int = 50 #maximum number of iterations for graident decent
         #weighting
         self.beta_cov : float = 0.4 #[m^2]
         self.beta_x : float = 10 #[m]
         self.alpha_LB  : float = 0.2 #Not stated in article
-        self.M_u = 1 #weight matrix for u, page 21
+        self.M_u = 0.1 #weight matrix for u, page 21
         #robot simulation
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
@@ -40,10 +40,10 @@ class planner():
         J_prev = 1e10 #absurdly big number as initial value
 
         #set weight matrices
-        cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        alpha_k = max(min(trace(cov_kpL_bar)/self.beta_cov, 1),self.alpha_LB)
-        print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
-        alpha_k = 1
+        # cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
+        # alpha_k = max(min(trace(cov_kpL_bar)/self.beta_cov, 1),self.alpha_LB)
+        alpha_k = 1 # <-------------- alpha_k fixed to 1
+
         M_x = 1-alpha_k
         M_sigma = alpha_k
 
@@ -52,7 +52,6 @@ class planner():
             #update u
             dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
             u = u - self.lambDa * dJ
-            # u[u > np.pi/4] = np.pi/4
 
             #check convergence
             plannedBackend = backend.copyObject()
@@ -67,10 +66,10 @@ class planner():
                 print('max iterations for gradient decent')
                 return u, J, plannedBackend
             
+            print(f"norm(dJ) = {norm(dJ)};     (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
-            print(f"norm(dJ) = {norm(dJ)};     (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
@@ -143,9 +142,8 @@ class planner():
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))    
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
-                if (r < self.range): #if viewed, compute noisy measurement
-                    cov_v_bar = self.cov_v * max(1,r/self.range ** 2)
-                    # meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
+                cov_v_bar = self.cov_v * max(1,r/self.range ** 4)
+                meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
         #create list of landmarks
