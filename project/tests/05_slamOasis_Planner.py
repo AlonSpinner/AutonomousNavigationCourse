@@ -30,7 +30,7 @@ def scenario():
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
     car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
-    dx = 1 #how much the robot goes forward in each timestep
+    dx = 2 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -52,7 +52,7 @@ backend = solver(ax = ax,
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
                     r_range = car.range, r_FOV = car.FOV, ax = ax)
-u = np.zeros(5) #initial guess for action. Determines horizon aswell
+u0 = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
@@ -79,7 +79,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
+        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
         odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)

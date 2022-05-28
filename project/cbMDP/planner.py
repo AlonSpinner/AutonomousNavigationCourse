@@ -7,6 +7,7 @@ from gtsam.symbol_shorthand import L, X
 
 import numpy as np
 from numpy import trace
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 
 class planner():
@@ -16,9 +17,9 @@ class planner():
         self.k : int = 0 #time step
         #"converger"
         self.epsConv : float = 1e-5
-        self.epsGrad : float = 1e-5
-        self.lambDa : float = 0.05 #larger number allows for bigger turns
-        self.i_max : int = 10 #maximum number of iterations for graident decent
+        self.epsGrad : float = 1e-3
+        self.lambDa : float = 0.005 #larger number allows for bigger turns
+        self.i_max : int = 100 #maximum number of iterations for graident decent
         #weighting
         self.beta : float = 0.45 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
@@ -39,7 +40,7 @@ class planner():
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
-        print(alpha_k)
+        print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
         M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)
 
@@ -52,14 +53,14 @@ class planner():
             #check convergence
             plannedBackend = backend.copyObject()
             J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
-            if np.linalg.norm(dJ) < self.epsConv:
+            if norm(dJ) < self.epsConv:
                 print('small graident')
                 self.k += 1
                 return u, J, plannedBackend
-            if np.linalg.norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
-                print('small change in J')
-                self.k += 1
-                return u, J, plannedBackend
+            # if norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
+            #     print('small change in J')
+            #     self.k += 1
+            #     return u, J, plannedBackend
             if i > self.i_max:
                 print('max iterations for gradient decent')
                 self.k += 1
@@ -68,6 +69,7 @@ class planner():
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
+            print(f"norm(dJ) = {norm(dJ)};     J = {J}")
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
@@ -96,7 +98,7 @@ class planner():
             # print(M_sigma)
 
         #use this formulation as we have no control on "gas" only on "wheel"
-        dist = np.linalg.norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
+        dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
         c = M_x * min(dist)
 
         #currently skipping third term from equation 41, even though it rewards loop closure
