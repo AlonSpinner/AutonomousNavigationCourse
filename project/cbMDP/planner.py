@@ -15,12 +15,12 @@ class planner():
                     r_cov_v : np.ndarray, r_range : float, r_FOV : float, ax : plt.Axes = None):
         self.k : int = 0 #time step
         #"converger"
-        self.epsConv : float = 1e-4
-        self.epsGrad : float = 1e-10
+        self.epsConv : float = 1e-5
+        self.epsGrad : float = 1e-5
         self.lambDa : float = 0.05 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta : float = 0.5 #[m^2]
+        self.beta : float = 0.45 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
         #robot simulation
