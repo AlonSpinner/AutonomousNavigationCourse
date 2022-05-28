@@ -19,10 +19,11 @@ class planner():
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.1 #larger number allows for bigger turns
-        self.i_max : int = 100 #maximum number of iterations for graident decent
+        self.lambDa : float = 0.05 #larger number allows for bigger turns
+        self.i_max : int = 50 #maximum number of iterations for graident decent
         #weighting
-        self.beta : float = 0.45 #[m^2]
+        self.beta_cov : float = 0.6 #[m^2]
+        self.beta_x : float = 10 #[m]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
         #robot simulation
@@ -40,11 +41,10 @@ class planner():
 
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
-        alpha_k = 0.1
+        alpha_k = max(min(trace(cov_kpL_bar)/self.beta_cov, 1),self.alpha_LB)
         print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
         M_x = 1-alpha_k
-        M_sigma = np.sqrt(alpha_k)
+        M_sigma = alpha_k
 
         i = 0 #iterations for gradient decent
         while True:
@@ -92,14 +92,13 @@ class planner():
         ests = []
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
-            b += M_sigma**2 * trace(cov)
+            b += M_sigma * trace(cov)/self.beta_cov
 
             ests.append(est)
-            # print(M_sigma)
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
-        c = M_x * min(dist)
+        c = M_x * min(dist)/self.beta_x
 
         #currently skipping third term from equation 41, even though it rewards loop closure
         
