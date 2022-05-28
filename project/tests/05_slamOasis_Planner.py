@@ -101,7 +101,7 @@ with plt.ion():
         #plot
         car.plot(markerSize = 10)
         backend.plot()
-        controller.plotPlan(u, plannedBackend, ax)
+        # controller.plotPlan(u, plannedBackend, ax)
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         

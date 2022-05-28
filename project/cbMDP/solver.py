@@ -127,6 +127,10 @@ class solver:
     def plot(self,poses = True ,poses_axis_length = 0.1, poses_Cov = True, landmark_Cov = True,
                   landmarks = True, landmarks_Index = False, landmarks_Semantics = False,
                   bestEstimate = False):
+
+        if self.ax is None:
+            fig, ax = plotting.spawnWorld
+            self.ax = ax
         
         current_estimate = self.calculateEstimate(bestEstimate = bestEstimate)
 
@@ -181,9 +185,7 @@ class solver:
 
     def plot_poses(self, current_estimate, marginals, axis_length = 0.1):
         if self.ax is None:
-            fig, ax = plotting.spawnWorld()
-            self.ax = ax
-            # raise Exception("you must provide an axes handle to solver if you want to plot")
+            raise Exception("you must provide an axes handle to solver if you want to plot")
 
         #remove old drawings if exist
         for graphics_pose in self.graphics_poses:
@@ -214,8 +216,8 @@ class solver:
 
         copySolver.isam2 = gtsam.ISAM2(self.isam2.params()) #reinitalize Isam2
         copySolver.isam2.update(self.graph, self.calculateEstimate()) #first update with global solver
-
         copySolver.semantics = deepcopy(self.semantics)
+
         if full:# -------------------dont require these for computations
             copySolver.ax = deepcopy(self.ax)
             copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
