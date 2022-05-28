@@ -19,10 +19,10 @@ class planner():
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.05 #larger number allows for bigger turns
+        self.lambDa : float = 0.1 #larger number allows for bigger turns
         self.i_max : int = 50 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 0.6 #[m^2]
+        self.beta_cov : float = 0.45 #[m^2]
         self.beta_x : float = 10 #[m]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
@@ -144,9 +144,9 @@ class planner():
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))    
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
-                # if abs(angle) < self.FOV/2 and (r < self.range): #if viewed, compute noisy measurement
-                cov_v_bar = self.cov_v * max(1,r/self.range)
-                meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
+                if (r < self.range * 4): #if viewed, compute noisy measurement
+                    cov_v_bar = self.cov_v * max(1,r/self.range ** 4)
+                    meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
         #create list of landmarks
