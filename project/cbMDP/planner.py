@@ -22,7 +22,7 @@ class planner():
         self.lambDa : float = 0.1 #larger number allows for bigger turns
         self.i_max : int = 50 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 0.45 #[m^2]
+        self.beta_cov : float = 0.4 #[m^2]
         self.beta_x : float = 10 #[m]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
@@ -86,23 +86,21 @@ class planner():
         #M_u and L provided from self
         a = 0
         for u_kpl in u:
-            a += zeta(u_kpl)**2 * self.M_u # mahalanobisISqrd doesnt work for scalars.. so...
+            a += zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
 
         b = 0
         ests = []
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
-            b += M_sigma * trace(cov)/self.beta_cov
-
+            b += trace(cov)
             ests.append(est)
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
-        c = M_x * min(dist)/self.beta_x
-
+        c = min(dist)
         #currently skipping third term from equation 41, even though it rewards loop closure
         
-        J = a + b + c
+        J = self.M_u*a + M_sigma*(b/self.beta_cov) + M_x*(c/self.beta_x)
         return J
 
     def innerLayer4alpha(self, backend : solver ,u : np.ndarray):
@@ -144,8 +142,8 @@ class planner():
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))    
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
-                if (r < self.range * 4): #if viewed, compute noisy measurement
-                    cov_v_bar = self.cov_v * max(1,r/self.range ** 4)
+                if (r < self.range): #if viewed, compute noisy measurement
+                    cov_v_bar = self.cov_v * max(1,r/self.range ** 2)
                     meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 

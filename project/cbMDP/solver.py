@@ -129,7 +129,7 @@ class solver:
                   bestEstimate = False):
 
         if self.ax is None:
-            fig, ax = plotting.spawnWorld
+            fig, ax = plotting.spawnWorld()
             self.ax = ax
         
         current_estimate = self.calculateEstimate(bestEstimate = bestEstimate)
