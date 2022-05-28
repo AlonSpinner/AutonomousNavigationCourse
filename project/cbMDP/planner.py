@@ -41,6 +41,7 @@ class planner():
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
+        alpha_k = 0
         print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
         M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)

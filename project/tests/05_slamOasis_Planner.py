@@ -84,6 +84,8 @@ with plt.ion():
         else:
             u, J, plannedBackend = controller.outerLayer(k, backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
             odom_cmd = gtsam.Pose2(dx,0,u[0])        
+            u0[:-1] = u[1:]; u0[-1] = 0.0
+        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
