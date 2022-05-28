@@ -50,7 +50,7 @@ backend = solver(ax = ax,
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
                     r_range = car.range, r_FOV = car.FOV, ax = ax)
-u0 = np.zeros(4) #initial guess for action. Determines horizon aswell
+u0 = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()

@@ -25,7 +25,7 @@ class planner():
         self.beta_cov : float = 0.4 #[m^2]
         self.beta_x : float = 10 #[m]
         self.alpha_LB  : float = 0.2 #Not stated in article
-        self.M_u = 0.1 #weight matrix for u, page 21
+        self.M_u = 1 #weight matrix for u, page 21
         #robot simulation
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
@@ -43,6 +43,7 @@ class planner():
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta_cov, 1),self.alpha_LB)
         print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
+        alpha_k = 1
         M_x = 1-alpha_k
         M_sigma = alpha_k
 
@@ -59,7 +60,7 @@ class planner():
             if norm(dJ) < self.epsConvGrad:
                 print('small dJ')
                 return u, J, plannedBackend
-            if norm((J-J_prev)/(J_prev + self.epsConvVal)) < self.epsConvVal:
+            if norm((J-J_prev)/(J_prev + 1e-10)) < self.epsConvVal:
                 print('small change in J')
                 return u, J, plannedBackend
             if i > self.i_max:
@@ -69,7 +70,7 @@ class planner():
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
-            print(f"norm(dJ) = {norm(dJ)};     J = {J}")
+            print(f"norm(dJ) = {norm(dJ)};     (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
@@ -144,7 +145,7 @@ class planner():
                 r = pose.range(lmML)
                 if (r < self.range): #if viewed, compute noisy measurement
                     cov_v_bar = self.cov_v * max(1,r/self.range ** 2)
-                    meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
+                    # meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
         #create list of landmarks
