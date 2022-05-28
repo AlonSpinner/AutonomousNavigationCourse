@@ -9,8 +9,6 @@ from cbMDP.robot import robot
 from cbMDP.map import map
 from cbMDP.planner import planner, stupidController
 
-from copy import deepcopy
-
 def scenario():
     np.random.seed(seed=2)
 
@@ -18,7 +16,7 @@ def scenario():
     xrange = (-10,30); yrange = (-10,30)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
-    N = 4
+    N = 10
     worldMap = map()
     worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
