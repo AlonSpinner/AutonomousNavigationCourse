@@ -51,7 +51,7 @@ backend = solver(ax = ax,
                 semantics = worldMap.exportSemantics())
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
-                    r_range = car.range, r_FOV = car.FOV)
+                    r_range = car.range, r_FOV = car.FOV, ax = ax)
 u = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init loggers
@@ -66,13 +66,6 @@ graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
 graphic_Plan_traj, = plt.plot([], [],'go-',markersize = 1)
 ax.set_title(f'target: {targetIndex}')
 
-u0 = np.zeros(10)
-u1, u2, u3 = u0, u0, u0
-u1[0] = np.pi/2
-u2[0] = np.pi
-u3[0] = 3*np.pi/2
-usets = [u0,u1,u2,u3]
-
 # run and plot simulation
 xcurrent_DR = car.pose
 with plt.ion():
@@ -86,12 +79,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        # uopts = []; Jopts = []
-        # for ui in deepcopy(usets):
-        u, J = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
-        # print(np.argmin(np.array(Jopts)))
-        # u = uopts[np.argmin(np.array(Jopts))]
-        # print(u)
+        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u ,goals[targetIndex]) #use previous u as initial condition
         odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
@@ -113,15 +101,9 @@ with plt.ion():
         #plot
         car.plot(markerSize = 10)
         backend.plot()
+        controller.plotPlan(u, plannedBackend, ax)
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
-        plan = np.zeros((1+u.size,2))
-        belief = backend.isam2.calculateEstimatePose2(X(backend.i))
-        plan[0,:] = np.array(belief.translation())
-        for i,ui in enumerate(u):
-            belief = belief.compose(gtsam.Pose2((dx,0,ui)))
-            plan[1+i,:] = np.array(belief.translation())
-        graphic_Plan_traj.set_data(plan[:,0],plan[:,1])
         
         plt.pause(0.01)
 

@@ -181,7 +181,9 @@ class solver:
 
     def plot_poses(self, current_estimate, marginals, axis_length = 0.1):
         if self.ax is None:
-            raise Exception("you must provide an axes handle to solver if you want to plot")
+            fig, ax = plotting.spawnWorld()
+            self.ax = ax
+            # raise Exception("you must provide an axes handle to solver if you want to plot")
 
         #remove old drawings if exist
         for graphics_pose in self.graphics_poses:
@@ -213,8 +215,8 @@ class solver:
         copySolver.isam2 = gtsam.ISAM2(self.isam2.params()) #reinitalize Isam2
         copySolver.isam2.update(self.graph, self.calculateEstimate()) #first update with global solver
 
+        copySolver.semantics = deepcopy(self.semantics)
         if full:# -------------------dont require these for computations
-            copySolver.semantics = deepcopy(self.semantics)
             copySolver.ax = deepcopy(self.ax)
             copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
             copySolver.graphics_poses = deepcopy(self.graphics_poses)
