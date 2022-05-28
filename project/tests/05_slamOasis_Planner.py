@@ -18,7 +18,7 @@ def scenario():
     xrange = (-10,30); yrange = (-10,30)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
-    N = 4
+    N = 10
     worldMap = map()
     worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
@@ -29,8 +29,8 @@ def scenario():
 
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
-    car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
-    dx = 2 #how much the robot goes forward in each timestep
+    car = robot(ax = ax, pose = pose0, FOV = np.radians(120), range = 2)
+    dx = 1.5 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -52,7 +52,8 @@ backend = solver(ax = ax,
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
                     r_range = car.range, r_FOV = car.FOV, ax = ax)
-u0 = np.zeros(5) #initial guess for action. Determines horizon aswell
+u = np.zeros(5) #initial guess for action. Determines horizon aswell
+u0 = np.zeros(5)
 
 #init loggers
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
@@ -68,19 +69,25 @@ ax.set_title(f'target: {targetIndex}')
 
 # run and plot simulation
 xcurrent_DR = car.pose
+reachedGoal = True
 with plt.ion():
     for k in range(0,1000):
 
         #switch target if reached previous
         if np.linalg.norm(car.pose.translation() - goals[targetIndex]) < targetRangeSwitch:
-                targetIndex += 1
-                ax.set_title(f'target: {targetIndex}')
-        if targetIndex == len(goals):
-                break #reached last goal
+            targetIndex += 1 
+            reachedGoal = True
+            
+            ax.set_title(f'target: {targetIndex}')
+            
+            if targetIndex == len(goals):
+                    break #reached last goal
 
         #Controller
-        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
-        odom_cmd = gtsam.Pose2(dx,0,u[0])        
+        if k % 3 == 0 or reachedGoal:
+            u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
+        odom_cmd = gtsam.Pose2(dx,0,u[ k % 3])
+        controller.k += 1     
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
@@ -105,6 +112,8 @@ with plt.ion():
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
+        print(reachedGoal)
+        reachedGoal = False
         plt.pause(0.01)
 
 plt.show()

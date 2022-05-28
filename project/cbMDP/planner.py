@@ -16,12 +16,13 @@ class planner():
                     r_cov_v : np.ndarray, r_range : float, r_FOV : float, ax : plt.Axes = None):
         self.k : int = 0 #time step
         #"converger"
-        self.epsConv : float = 1e-5
+        self.epsConvGrad : float = 1e-5
+        self.epsConvVal : float = 1e-6
         self.epsGrad : float = 1e-3
         self.lambDa : float = 0.005 #larger number allows for bigger turns
-        self.i_max : int = 100 #maximum number of iterations for graident decent
+        self.i_max : int = 50 #maximum number of iterations for graident decent
         #weighting
-        self.beta : float = 0.45 #[m^2]
+        self.beta : float = 0.6 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.M_u = 0.1 #weight matrix for u, page 21
         #robot simulation
@@ -40,9 +41,9 @@ class planner():
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
         alpha_k = max(min(trace(cov_kpL_bar)/self.beta, 1),self.alpha_LB)
-        print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
+        # print(f"-----------------------------------------------------------alpha_k = {alpha_k}")
         M_x = 1-alpha_k
-        M_sigma = np.sqrt(alpha_k)
+        M_sigma = alpha_k
 
         while True:
             #update u
@@ -53,23 +54,20 @@ class planner():
             #check convergence
             plannedBackend = backend.copyObject()
             J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
-            if norm(dJ) < self.epsConv:
+            if norm(dJ) < self.epsConvGrad:
                 print('small graident')
-                self.k += 1
                 return u, J, plannedBackend
-            # if norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
-            #     print('small change in J')
-            #     self.k += 1
-            #     return u, J, plannedBackend
+            if norm((J-J_prev)/(J_prev + self.epsConvVal)) < self.epsConvVal:
+                print('small change in J')
+                return u, J, plannedBackend
             if i > self.i_max:
                 print('max iterations for gradient decent')
-                self.k += 1
                 return u, J, plannedBackend
             
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
-            print(f"norm(dJ) = {norm(dJ)};     J = {J}")
+            # print(f"norm(dJ) = {norm(dJ)};     J = {J}")
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
@@ -92,7 +90,7 @@ class planner():
         ests = []
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
-            b += M_sigma**2 * trace(cov)
+            b += M_sigma * trace(cov)
 
             ests.append(est)
             # print(M_sigma)
