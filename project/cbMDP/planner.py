@@ -16,7 +16,8 @@ class planner():
                     r_cov_v : np.ndarray, r_range : float, r_FOV : float, ax : plt.Axes = None):
         self.k : int = 0 #time step
         #"converger"
-        self.epsConv : float = 1e-5
+        self.epsConvGrad : float = 1e-5
+        self.epsConvVal : float = 1e-3
         self.epsGrad : float = 1e-3
         self.lambDa : float = 0.005 #larger number allows for bigger turns
         self.i_max : int = 100 #maximum number of iterations for graident decent
@@ -33,9 +34,9 @@ class planner():
         #graphics
         self.ax = ax
         self.graphic_plan = [] #placeholder
-    def outerLayer(self,backend : solver ,u : np.ndarray ,goal : np.ndarray): #plan
+    def outerLayer(self, k : int ,backend : solver ,u : np.ndarray ,goal : np.ndarray): #plan
+        self.k = k
         J_prev = 1e10 #absurdly big number as initial value
-        i = 0
 
         #set weight matrices
         cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
@@ -44,6 +45,7 @@ class planner():
         M_x = 1-alpha_k
         M_sigma = np.sqrt(alpha_k)
 
+        i = 0 #iterations for gradient decent
         while True:
             #update u
             dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
@@ -53,17 +55,14 @@ class planner():
             #check convergence
             plannedBackend = backend.copyObject()
             J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
-            if norm(dJ) < self.epsConv:
+            if norm(dJ) < self.epsConvGrad:
                 print('small graident')
-                self.k += 1
                 return u, J, plannedBackend
-            # if norm((J-J_prev)/(J_prev + self.epsConv)) < self.epsConv:
-            #     print('small change in J')
-            #     self.k += 1
-            #     return u, J, plannedBackend
+            if norm((J-J_prev)/(J_prev + self.epsConvVal)) < self.epsConvVal:
+                print('small change in J')
+                return u, J, plannedBackend
             if i > self.i_max:
                 print('max iterations for gradient decent')
-                self.k += 1
                 return u, J, plannedBackend
             
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
@@ -176,3 +175,10 @@ def mahalanobisIsqrd(a : np.ndarray ,S : np.ndarray):
 def zeta(u : float) -> float:
     #bottom of page 18 - some known function that quantifies the usage of control u
     return u # penalizes changes in direciton, page 45, will be squared later in cost
+
+
+def stupidController(k, backend, goal):
+    belief = backend.calculateEstimate().atPose2(X(k))
+    err = belief.bearing(goal).theta()
+    u = np.sign(err)  * min(abs(err), np.pi/4)
+    return u

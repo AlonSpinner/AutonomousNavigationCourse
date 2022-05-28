@@ -7,7 +7,7 @@ import cbMDP.utils.plotting as plotting
 from cbMDP.solver import solver
 from cbMDP.robot import robot
 from cbMDP.map import map
-from cbMDP.planner import planner
+from cbMDP.planner import planner, stupidController
 
 from copy import deepcopy
 
@@ -30,7 +30,7 @@ def scenario():
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
     car = robot(ax = ax, pose = pose0, FOV = np.radians(360), range = 2)
-    dx = 2 #how much the robot goes forward in each timestep
+    dx = 1 #how much the robot goes forward in each timestep
     
     #----- Goals to visit
     goals = np.array([[3,6],
@@ -63,7 +63,6 @@ worldMap.plot(ax = ax, plotIndex = False, plotCov = False)
 plotting.plot_goals(ax, goals)
 graphic_GT_traj, = plt.plot([], [],'ko-',markersize = 1)
 graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
-graphic_Plan_traj, = plt.plot([], [],'go-',markersize = 1)
 ax.set_title(f'target: {targetIndex}')
 
 # run and plot simulation
@@ -79,8 +78,12 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        u, J, plannedBackend = controller.outerLayer(backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
-        odom_cmd = gtsam.Pose2(dx,0,u[0])        
+        if targetIndex < 3:
+            u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
+            odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
+        else:
+            u, J, plannedBackend = controller.outerLayer(k, backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
+            odom_cmd = gtsam.Pose2(dx,0,u[0])        
 
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
