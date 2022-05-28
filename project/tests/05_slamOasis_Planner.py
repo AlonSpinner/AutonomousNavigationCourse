@@ -16,7 +16,7 @@ def scenario():
     xrange = (-10,30); yrange = (-10,30)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
-    N = 10
+    N = 4
     worldMap = map()
     worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
@@ -76,7 +76,8 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        if targetIndex < 3:
+        if np.trace(backend.isam2.marginalCovariance(X(k))) < 0.14:
+        # if targetIndex < 3:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
             odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
         else:

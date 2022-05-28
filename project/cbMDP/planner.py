@@ -19,8 +19,8 @@ class planner():
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-6
         self.epsGrad : float = 1e-3
-        self.lambDa : float = 0.8 #larger number allows for bigger turns
-        self.i_max : int = 50 #maximum number of iterations for graident decent
+        self.lambDa : float = 1.2 #larger number allows for bigger turns
+        self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
         self.beta_cov : float = 0.4 #[m^2]
         self.beta_x : float = 10 #[m]
@@ -142,7 +142,7 @@ class planner():
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))    
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
-                cov_v_bar = self.cov_v * max(1,r/self.range ** 4)
+                cov_v_bar = self.cov_v * max(1,r/self.range ** 6)
                 meas.append(meas_landmark(lm_index, r, angle, cov_v_bar , lm_label))
             return meas
 
