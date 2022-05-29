@@ -18,14 +18,15 @@ class planner():
         #"converger"
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-6
-        self.epsGrad : float = 1e-3
-        self.lambDa : float = 1.2 #larger number allows for bigger turns
+        self.epsGrad : float = 1e-5
+        self.lambDa : float = 0.001 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 0.4 #[m^2]
-        self.beta_x : float = 10 #[m]
+        self.beta_cov : float = 5 #0.35 #[m^2]
+        self.beta_x : float = 15 #[m] typical range where with dead reckoning we cross covariance bound
         self.alpha_LB  : float = 0.2 #Not stated in article
-        self.M_u = 0.1 #weight matrix for u, page 21
+        self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
+        self.M_u = 0.0 #0.1 #weight matrix for u, page 21
         #robot simulation
         self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
@@ -39,10 +40,14 @@ class planner():
         self.k = k
         J_prev = 1e10 #absurdly big number as initial value
 
-        #set weight matrices
-        # cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        # alpha_k = max(min(trace(cov_kpL_bar)/self.beta_cov, 1),self.alpha_LB)
-        alpha_k = 1 # <-------------- alpha_k fixed to 1
+        # set weight matrices
+        cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
+        alpha_k = min(trace(cov_kpL_bar)/self.beta_cov, 1)
+        #when "turning" trace(cov) decreases. This causes alpha_k to decrease when we turn to approach high information landmarks
+        #thus, we keep alpha_k high as long as loop closure has not happend as follows:
+        if self.alpha_km1 == 1.0 and alpha_k > self.alpha_LB:
+            alpha_k = 1.0
+        print(f"------------------------------------------------>alpha_k = {alpha_k}")
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -51,7 +56,7 @@ class planner():
         while True:
             #update u
             dJ = self.computeGradient(backend.copyObject(), u, M_x, M_sigma, goal)
-            u = u - self.lambDa * dJ
+            u = u - self.lambDa * dJ * max(10 *(alpha_k < 0.5),1)
 
             #check convergence
             plannedBackend = backend.copyObject()
@@ -66,7 +71,7 @@ class planner():
                 print('max iterations for gradient decent')
                 return u, J, plannedBackend
             
-            print(f"norm(dJ) = {norm(dJ)};     (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
+            print(f"J = {J};    norm(dJ) = {norm(dJ)};    (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
@@ -88,19 +93,26 @@ class planner():
         for u_kpl in u:
             a += zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
 
-        b = 0
         ests = []
         for l, u_kpl in enumerate(u):
             est,cov = self.innerLayer(backend,np.array([u_kpl]))
-            b += trace(cov)
+            # b += trace(cov)
             ests.append(est)
+
+        b = 0
+        # n = len(backend.seen_landmarks["id"])
+        # for lm_index in backend.seen_landmarks["id"]:
+        #     lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
+        #     lm_cov = backend.isam2.marginalCovariance(L(lm_index))
+        #     lm_r = est.range(lm_mu)
+        #     b += lm_r/trace(lm_cov)/n/100
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
         c = min(dist)
         #currently skipping third term from equation 41, even though it rewards loop closure
         
-        J = self.M_u*a + M_sigma*(b/self.beta_cov) + M_x*(c/self.beta_x)
+        J = self.M_u*a + M_sigma*(b/(self.beta_cov * self.beta_x)) + M_x*c
         return J
 
     def innerLayer4alpha(self, backend : solver ,u : np.ndarray):

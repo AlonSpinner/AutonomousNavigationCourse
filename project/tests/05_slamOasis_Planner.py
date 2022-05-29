@@ -65,6 +65,7 @@ ax.set_title(f'target: {targetIndex}')
 
 # run and plot simulation
 xcurrent_DR = car.pose
+realTime = True
 with plt.ion():
     for k in range(0,1000):
 
@@ -76,7 +77,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        if np.trace(backend.isam2.marginalCovariance(X(k))) < 0.14:
+        if np.trace(backend.isam2.marginalCovariance(X(k))) < 0.14 and not realTime:
         # if targetIndex < 3:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
             odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
@@ -84,6 +85,7 @@ with plt.ion():
             u, J, plannedBackend = controller.outerLayer(k, backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
             odom_cmd = gtsam.Pose2(dx,0,u[0])        
             u0[:-1] = u[1:]; u0[-1] = 0.0
+            realTime = True
             #plannedBackend.plot()
         
 
