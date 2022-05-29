@@ -17,12 +17,12 @@ class planner():
         self.k : int = 0 #time step
         #"converger"
         self.epsConvGrad : float = 1e-5
-        self.epsConvVal : float = 1e-4
-        self.epsGrad : float = 1e-5
+        self.epsConvVal : float = 1e-8
+        self.epsGrad : float = 1e-10
         self.lambDa : float = 0.01 #larger number allows for bigger turns
-        self.i_max : int = 30 #maximum number of iterations for graident decent
+        self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 0.6 #0.35 #[m^2]
+        self.beta_cov : float = 3 #0.35 #[m^2]
         self.beta_x : float = 15 #[m] typical range where with dead reckoning we cross covariance bound
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
@@ -41,12 +41,15 @@ class planner():
         J_prev = 1e10 #absurdly big number as initial value
 
         # set weight matrices
-        cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        alpha_k = min(trace(cov_kpL_bar)/self.beta_cov, 1)
-        #when "turning" trace(cov) decreases. This causes alpha_k to decrease when we turn to approach high information landmarks
+        # cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
+        # alpha_k = min(trace(cov_kpL_bar)/self.beta_cov, 1)
+        alpha_k = min(trace(backend.isam2.marginalCovariance(X(self.k)))/self.beta_cov, 1)
+        #NOT SURE WHY: when "turning" trace(cov) decreases which is not what we want
         #thus, we keep alpha_k high as long as loop closure has not happend as follows:
-        if self.alpha_km1 == 1.0 and alpha_k > self.alpha_LB:
-            alpha_k = 1.0
+        if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB:
+            alpha_k = self.alpha_km1
+        self.alpha_km1 = alpha_k
+        alpha_k = logisticCurve(alpha_k, 0.5, 20)
         print(f"------------------------------------------------>alpha_k = {alpha_k}")
 
         M_x = 1-alpha_k
@@ -105,11 +108,13 @@ class planner():
             lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
             lm_cov = backend.isam2.marginalCovariance(L(lm_index))
             lm_r = est.range(lm_mu)
-            b += lm_r/trace(lm_cov)/n/100
+            b += lm_r/trace(lm_cov)/n
+        b *= trace(backend.isam2.marginalCovariance(X(self.k)))
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
         c = min(dist)
+
         #currently skipping third term from equation 41, even though it rewards loop closure
         
         J = self.M_u*a + M_sigma*b + M_x*c
@@ -185,9 +190,13 @@ def zeta(u : float) -> float:
     #bottom of page 18 - some known function that quantifies the usage of control u
     return u # penalizes changes in direciton, page 45, will be squared later in cost
 
-
 def stupidController(k, backend, goal):
     belief = backend.calculateEstimate().atPose2(X(k))
     err = belief.bearing(goal).theta()
     u = np.sign(err)  * min(abs(err), np.pi/4)
     return u
+
+def logisticCurve(x, x0, k = 0.3, L = 1):
+    # https://en.wikipedia.org/wiki/Logistic_function
+    y = L/(1 + np.exp(-k*(x-x0)))
+    return y
