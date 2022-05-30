@@ -27,7 +27,7 @@ def scenario():
 
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
-    car = robot(ax = ax, pose = pose0, FOV = np.radians(120), range = 4)
+    car = robot(ax = ax, pose = pose0, FOV = np.radians(120), range = 3)
     dx = 1 #how much the robot goes forward in each timestep
     
     #----- Goals to visit

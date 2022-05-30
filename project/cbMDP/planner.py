@@ -41,10 +41,10 @@ class planner():
         J_prev = 1e10 #absurdly big number as initial value
 
         # set weight matrices
-        # cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
-        # alpha_k = min(trace(cov_kpL_bar)/self.beta_cov, 1)
-        alpha_k = min(trace(backend.isam2.marginalCovariance(X(self.k)))/self.beta_cov, 1)
-        #NOT SURE WHY: when "turning" trace(cov) decreases which is not what we want
+        cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
+        cov_k = backend.isam2.marginalCovariance(X(self.k))
+        alpha_k = min(max(trace(cov_kpL_bar),trace(cov_k))/self.beta_cov, 1)
+        #turning may reduce covariance trace due to seeing new landmarks. Sometimes in unexpected ways
         #thus, we keep alpha_k high as long as loop closure has not happend as follows:
         if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB:
             alpha_k = self.alpha_km1
