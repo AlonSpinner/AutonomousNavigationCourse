@@ -13,12 +13,12 @@ def scenario():
     np.random.seed(seed=1)
 
     #------Build worldmap
-    xrange = (-10,30); yrange = (-10,30)
+    xrange = (-10,25); yrange = (-10,25)
     fig , ax = plotting.spawnWorld(xrange, yrange)
     
     N = 4
     worldMap = map()
-    worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
+    worldMap.fillMapRandomly(2*N,["rose"],(1,7),(4,8))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
     worldMap.fillMapRandomly(N,["hydrangea"],(14,17),(17,19))
     worldMap.fillMapRandomly(N,["tulip"],(12,14),(-2,2))
@@ -78,7 +78,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        if k < 35:
+        if k < 0:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
             odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
         else:

@@ -18,7 +18,7 @@ class robot:
             odometry_noise = np.zeros((3,3))
             odometry_noise[0,0] = 0.1**2 #dx noise
             odometry_noise[1,1] = 0.1**2 #dy noise
-            odometry_noise[2,2] =np.radians(1)**2 #angular noise
+            odometry_noise[2,2] =np.radians(1.3)**2 #angular noise
 
         if rgbd_noise is None:
             rgbd_noise = np.zeros((2,2))
