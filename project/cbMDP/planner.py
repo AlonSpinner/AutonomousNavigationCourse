@@ -22,13 +22,13 @@ class planner():
         self.lambDa : float = 0.01 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 3 #0.35 #[m^2]
+        self.beta_cov : float = 4 #0.35 #[m^2]
         self.beta_x : float = 15 #[m] typical range where with dead reckoning we cross covariance bound
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
         self.M_u = 0.0 #0.1 #weight matrix for u, page 21
         #robot simulation
-        self.dx = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
+        self.dx : float = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
         self.cov_v : np.ndarray = r_cov_v
         self.range : float = r_range
@@ -49,8 +49,14 @@ class planner():
         if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB:
             alpha_k = self.alpha_km1
         self.alpha_km1 = alpha_k
-        alpha_k = logisticCurve(alpha_k, 0.5, 20)
         print(f"------------------------------------------------>alpha_k = {alpha_k}")
+        # alpha_k = logisticCurve(alpha_k, 0.5, 20)
+        # print(f"------------------------------------------------>post logistic alpha_k = {alpha_k}")
+        
+        alpha_k = alpha_k > 0.5 #use if/else instead of logisticCurve
+        if alpha_k == 0 and self.alpha_km1 != 0:
+            pose = backend.isam2.calculateEstimatePose2(X(k))
+            u[0] = pose.bearing(goal).theta()
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -64,6 +70,8 @@ class planner():
             #check convergence
             plannedBackend = backend.copyObject()
             J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
+            print(f"J = {J};    norm(dJ) = {norm(dJ)};    (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
+            
             if norm(dJ) < self.epsConvGrad:
                 print('small dJ')
                 return u, J, plannedBackend
@@ -74,7 +82,6 @@ class planner():
                 print('max iterations for gradient decent')
                 return u, J, plannedBackend
             
-            print(f"J = {J};    norm(dJ) = {norm(dJ)};    (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
             self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
@@ -108,12 +115,14 @@ class planner():
             lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
             lm_cov = backend.isam2.marginalCovariance(L(lm_index))
             lm_r = est.range(lm_mu)
-            b += lm_r/trace(lm_cov)/n
+            b += lm_r/trace(lm_cov)/n #divsion of n here to avoid error when n==0
         b *= trace(backend.isam2.marginalCovariance(X(self.k)))
+        # b **=2
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
         c = min(dist)
+        c **=2
 
         #currently skipping third term from equation 41, even though it rewards loop closure
         
