@@ -14,7 +14,7 @@ class planner():
 
     def __init__(self, r_dx : float, r_cov_w : np.ndarray, \
                     r_cov_v : np.ndarray, r_range : float, r_FOV : float, ax : plt.Axes = None):
-        self.k : int = 0 #time step
+        self.k : int = 0 #time step, #46
         #"converger"
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-8
