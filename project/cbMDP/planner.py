@@ -17,12 +17,12 @@ class planner():
         self.k : int = 0 #time step, #46
         #"converger"
         self.epsConvGrad : float = 1e-5
-        self.epsConvVal : float = 1e-8
+        self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-10
-        self.lambDa : float = 0.01 #larger number allows for bigger turns
+        self.lambDa : float = 0.001 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 4 #0.35 #[m^2]
+        self.beta_cov : float = 3.7 #0.35 #[m^2]
         self.beta_x : float = 15 #[m] typical range where with dead reckoning we cross covariance bound
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
@@ -56,7 +56,7 @@ class planner():
         alpha_k = alpha_k > 0.5 #use if/else instead of logisticCurve
         if alpha_k == 0 and self.alpha_km1 != 0:
             pose = backend.isam2.calculateEstimatePose2(X(k))
-            u[0] = pose.bearing(goal).theta()
+            u[0] = pose.bearing(goal).theta()/2
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -117,17 +117,15 @@ class planner():
             lm_r = est.range(lm_mu)
             b += lm_r/trace(lm_cov)/n #divsion of n here to avoid error when n==0
         b *= trace(backend.isam2.marginalCovariance(X(self.k)))
-        # b **=2
 
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
         c = min(dist)
-        c **=2
 
         #currently skipping third term from equation 41, even though it rewards loop closure
         
         J = self.M_u*a + M_sigma*b + M_x*c
-        return J
+        return J**2
 
     def innerLayer4alpha(self, backend : solver ,u : np.ndarray):
         #returns covariance of X_kpL given no landmark measurements

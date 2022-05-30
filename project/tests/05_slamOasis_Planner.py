@@ -21,9 +21,9 @@ def scenario():
     worldMap.fillMapRandomly(N,["rose"],(2,6),(5,7))
     worldMap.fillMapRandomly(N,["lily"],(2,8),(15,18))
     worldMap.fillMapRandomly(N,["hydrangea"],(14,17),(17,19))
-    worldMap.fillMapRandomly(N,["tulip"],(17,19),(-2,2))
-    worldMap.fillMapRandomly(N,["orchid"],(10,12),(-7,-9))
-    worldMap.fillMapRandomly(N,["peony"],(-8,-6),(-2,-4))
+    worldMap.fillMapRandomly(N,["tulip"],(12,14),(-2,2))
+    worldMap.fillMapRandomly(N,["orchid"],(5,7),(-7,-9))
+    worldMap.fillMapRandomly(N,["peony"],(-8,-6),(6,8))
 
     #------Spawn Robot
     pose0 = gtsam.Pose2(1.0,0.0,np.pi/2)
@@ -34,9 +34,9 @@ def scenario():
     goals = np.array([[3,6],
                         [4,17],
                         [16,18],
-                        [18,0],
-                        [11,-8],
-                        [-7,-3]])
+                        [13,0],
+                        [6,-8],
+                        [-7,7]])
     targetRangeSwitch = 2
 
     return car, worldMap, ax, fig, goals, targetRangeSwitch, dx
@@ -66,8 +66,9 @@ ax.set_title(f'target: {targetIndex}')
 # run and plot simulation
 xcurrent_DR = car.pose
 realTime = False
+k = 0
 with plt.ion():
-    for k in range(0,1000):
+    while True:
 
         #switch target if reached previous
         if np.linalg.norm(car.pose.translation() - goals[targetIndex]) < targetRangeSwitch:
@@ -77,7 +78,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        if k < 39:
+        if k < 35:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
             odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
         else:
@@ -87,7 +88,6 @@ with plt.ion():
             realTime = True
             #plannedBackend.plot()
         
-
         meas_odom = car.moveAndMeasureOdometrey(odom_cmd)
         meas_lms = car.measureLandmarks(worldMap.landmarks)
 
@@ -99,6 +99,9 @@ with plt.ion():
         
         #dead reckoning integration
         xcurrent_DR = xcurrent_DR.compose(meas_odom.dpose)
+
+        #update time index
+        k += 1
 
         #log history
         hist_GT = np.vstack([hist_GT,car.pose.translation()])
