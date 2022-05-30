@@ -22,8 +22,7 @@ class planner():
         self.lambDa : float = 0.001 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 5 #0.35 #[m^2]
-        self.beta_x : float = 15 #[m] typical range where with dead reckoning we cross covariance bound
+        self.beta_cov : float = 3.9 #[m^2]
         self.alpha_LB  : float = 0.2 #Not stated in article
         self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
         self.M_u = 0.0 #0.1 #weight matrix for u, page 21
@@ -96,7 +95,6 @@ class planner():
         return dJ
 
     def evaluateObjective(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> float:
-        #M_u and L provided from self
         a = 0
         for u_kpl in u:
             a += zeta(u_kpl) # mahalanobisISqrd doesnt work for scalars.. so...
@@ -108,14 +106,14 @@ class planner():
             # b += trace(cov)
             ests.append(est)
 
-        b = 0
+        b = 0 #inverse to the probabilty of loop closure
         n = len(backend.seen_landmarks["id"])
         for lm_index in backend.seen_landmarks["id"]:
             lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
             lm_cov = backend.isam2.marginalCovariance(L(lm_index))
             lm_r = est.range(lm_mu)
             b += lm_r/trace(lm_cov)/n #divsion of n here to avoid error when n==0
-        b *= trace(backend.isam2.marginalCovariance(X(self.k)))/10
+        b *= trace(backend.isam2.marginalCovariance(X(self.k)))/10 #dividing by 10 works and im not changing it
         b **= 2
 
         #use this formulation as we have no control on "gas" only on "wheel"
@@ -149,7 +147,7 @@ class planner():
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
             for lm in lms:
                 backend.addlandmarkMeasurement(lm)
-            backend.update()
+            backend.update(2)
 
             covs.append(backend.isam2.marginalCovariance(X(backend.i))) #i == k
             ests.append(backend.isam2.calculateEstimatePose2(X(backend.i)))
