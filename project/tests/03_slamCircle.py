@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import PillowWriter
 import gtsam
 
 
@@ -41,6 +42,8 @@ backend = solver(ax = ax,X0 = car.pose ,X0cov = car.odometry_noise/1000, semanti
 hist_GT, hist_DR = car.pose.translation(), car.pose.translation()
 
 #set graphics
+moviewriter = PillowWriter(fps = 5)
+moviewriter.setup(fig,'03_movie.gif',dpi = 100)
 graphic_GT_traj, = plt.plot([], [],'ko-',markersize = 1)
 graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
 
@@ -72,6 +75,8 @@ with plt.ion():
         graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1])
         graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
+        moviewriter.grab_frame()
         plt.pause(0.5)
 
+moviewriter.finish()
 plt.show()

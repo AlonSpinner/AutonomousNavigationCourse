@@ -35,6 +35,7 @@ class planner():
         #graphics
         self.ax = ax
         self.graphic_plan = [] #placeholder
+        self.moviewriter = []
     def outerLayer(self, k : int ,backend : solver ,u : np.ndarray ,goal : np.ndarray): #plan
         self.k = k
         J_prev = 1e10 #absurdly big number as initial value
@@ -79,9 +80,14 @@ class planner():
                 print('max iterations for gradient decent')
                 return u, J, plannedBackend
             
-            self.plotPlan(u, plannedBackend); plt.pause(0.00001)
             i += 1
             J_prev = J
+
+            if self.moviewriter:
+                self.plotPlan(u, plannedBackend)
+                plt.pause(0.00001)
+                self.moviewriter.grab_frame()
+
 
     def computeGradient(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> np.ndarray:
         #M_u and L provided from self
@@ -178,7 +184,7 @@ class planner():
                 print('no axes provided to object')
 
         if  not self.graphic_plan:
-            self.graphic_plan, = ax.plot([], [],'go-',markersize = 1)
+            self.graphic_plan, = ax.plot([], [],'go-',markersize = 2)
         
         plan = np.zeros((1+u.size,2))
         belief = backend.isam2.calculateEstimatePose2(X(self.k))

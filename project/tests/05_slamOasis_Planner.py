@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import PillowWriter
 import gtsam
-from gtsam.symbol_shorthand import L, X
 
 import cbMDP.utils.plotting as plotting
 from cbMDP.solver import solver
@@ -43,6 +43,9 @@ def scenario():
 
 car, worldMap, ax, fig, goals, targetRangeSwitch, dx = scenario()
 
+moviewriter = PillowWriter(fps = 15)
+moviewriter.setup(fig,'05_movie.gif',dpi = 100)
+
 #init estimator and controller
 backend = solver(ax = ax, 
                 X0 = car.pose ,X0cov = car.odometry_noise/1000, 
@@ -50,6 +53,7 @@ backend = solver(ax = ax,
 controller = planner(r_dx = dx, 
                     r_cov_w = car.odometry_noise, r_cov_v = car.rgbd_noise,
                     r_range = car.range, r_FOV = car.FOV, ax = ax)
+controller.moviewriter = moviewriter
 u0 = np.zeros(5) #initial guess for action. Determines horizon aswell
 
 #init loggers
@@ -62,6 +66,7 @@ plotting.plot_goals(ax, goals)
 graphic_GT_traj, = plt.plot([], [],'ko-',markersize = 1)
 graphic_DR_traj, = plt.plot([], [],'ro-',markersize = 1)
 ax.set_title(f'target: {targetIndex}')
+car.plot(markerSize = 10)
 
 # run and plot simulation
 xcurrent_DR = car.pose
@@ -80,7 +85,7 @@ with plt.ion():
         #Controller
         if k < 0:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
-            odom_cmd = gtsam.Pose2(dx,0,u_stupid) 
+            odom_cmd = gtsam.Pose2(dx,0,u_stupid)
         else:
             u, J, plannedBackend = controller.outerLayer(k, backend.copyObject(), u0 ,goals[targetIndex]) #use previous u as initial condition
             odom_cmd = gtsam.Pose2(dx,0,u[0])        
@@ -114,6 +119,8 @@ with plt.ion():
         # graphic_GT_traj.set_data(hist_GT[:,0],hist_GT[:,1]) #plot ground truth trajectory
         # graphic_DR_traj.set_data(hist_DR[:,0],hist_DR[:,1])
         
+        moviewriter.grab_frame()
         plt.pause(0.01)
 
+moviewriter.finish()
 plt.show()
