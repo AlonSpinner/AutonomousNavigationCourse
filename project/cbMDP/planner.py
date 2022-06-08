@@ -22,10 +22,10 @@ class planner():
         self.lambDa : float = 0.001 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta_cov : float = 3.9 #[m^2]
-        self.alpha_LB  : float = 0.2 #Not stated in article
-        self.alpha_km1 : float = self.alpha_LB #keep previous alpha_k
-        self.M_u = 0.0 #0.1 #weight matrix for u, page 21
+        self.beta : float = 2.4 #[m^2]
+        self.alpha_LB  : float = 0.6 #Not stated in article
+        self.alpha_km1 : float = 0.0 #keep previous alpha_k
+        self.M_u = 0.1 #0.1 #weight matrix for u, page 21
         #robot simulation
         self.dx : float = r_dx #for u -> Pose2(robot_dx,0,u) in innerLayer
         self.cov_w : np.ndarray = r_cov_w
@@ -41,20 +41,23 @@ class planner():
         J_prev = 1e10 #absurdly big number as initial value
 
         # set weight matrices
-        cov_kpL_bar = self.innerLayer4alpha(backend.copyObject(),u)
+        ests_bar, covs_bar  = self.innerLayerBAR(backend.copyObject(),u)
+        cov_kpL_bar = covs_bar[-1]
         cov_k = backend.isam2.marginalCovariance(X(self.k))
-        alpha_k = min(max(trace(cov_kpL_bar),trace(cov_k))/self.beta_cov, 1)
+        alpha_k = min(max(trace(cov_kpL_bar),trace(cov_k))/self.beta, 1)
         #turning may reduce covariance trace due to seeing new landmarks. Sometimes in unexpected ways
         #thus, we keep alpha_k high as long as loop closure has not happend as follows:
-        if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB:
+        if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB: #self.alpha_km1 > alpha_k instead of alpha_km1 == 1
             alpha_k = self.alpha_km1
-        self.alpha_km1 = alpha_k
-        print(f"------------------------------------------------>alpha_k = {alpha_k}")
+        print(f"-------------------------------------->calculated alpha_k = {alpha_k}")
         
-        alpha_k = alpha_k > 0.5 #use if/else instead of logisticCurve
-        if alpha_k == 0 and self.alpha_km1 != 0: #if loop colsure occured, u[0] should point more towards goal
+        alpha_k = float(alpha_k > 0.5) #use if/else instead of logisticCurve
+        if alpha_k == 0: #and self.alpha_km1 != 0: #if loop colsure occured, u[0] should point more towards goal
             pose = backend.isam2.calculateEstimatePose2(X(k))
             u[0] = pose.bearing(goal).theta()/2
+        if alpha_k > self.alpha_LB: #and self.alpha_km1 <= self.alpha_LB:
+            pose = backend.isam2.calculateEstimatePose2(X(k))
+            u[0] = pose.bearing(np.array([0,0])).theta()/2
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -81,6 +84,7 @@ class planner():
                 return u, J, plannedBackend
             
             i += 1
+            self.alpha_km1 = alpha_k
             J_prev = J
 
             if self.moviewriter:
@@ -101,43 +105,59 @@ class planner():
         return dJ
 
     def evaluateObjective(self, backend : solver, u : np.ndarray, M_x : float, M_sigma: float, goal : np.ndarray) -> float:
+        
+        #term c: distance from goal
+        ests_bar,covs_bar = self.innerLayerBAR(backend.copyObject(),u) #copy backend as we need it laterz
+        #use this formulation as we have no control on "gas" only on "wheel"
+        dist = norm(np.array([est.translation() for est in ests_bar]) - goal, axis = 1)
+        c = min(dist)**2
+        c *= M_x
+        
+        #term a: control effort
         a = 0
         for u_kpl in u:
-            a += zeta(u_kpl) # mahalanobisISqrd doesnt work for scalars.. so...
-        a **= 2
+            a += zeta(u_kpl)**2 # mahalanobisISqrd doesnt work for scalars.. so...
+        a *= self.M_u
 
-        ests = []
+        #term b: poses covariance
+        b = 0
         for l, u_kpl in enumerate(u):
-            est,cov = self.innerLayer(backend,np.array([u_kpl]))
-            # b += trace(cov)
-            ests.append(est)
+            est_kpl,cov_kpl = self.innerLayer(backend,np.array([u_kpl]))
+            b += trace(cov_kpl)
+        b *= M_sigma
 
-        b = 0 #inverse to the probabilty of loop closure
-        n = len(backend.seen_landmarks["id"])
-        for lm_index in backend.seen_landmarks["id"]:
-            lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
-            lm_cov = backend.isam2.marginalCovariance(L(lm_index))
-            lm_r = est.range(lm_mu)
-            b += lm_r/trace(lm_cov)/n #divsion of n here to avoid error when n==0
-        b *= trace(backend.isam2.marginalCovariance(X(self.k)))/10 #dividing by 10 works and im not changing it
-        b **= 2
+        #term d: loop closurer. kpl -> kpL after all iterations in term b
+        d = 0
+        # n = len(backend.seen_landmarks["id"])
+        # if n > 0:
+        #     for lm_index in backend.seen_landmarks["id"]:
+        #         lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
+        #         lm_cov = backend.isam2.marginalCovariance(L(lm_index))
+        #         lm_r = est_kpl.range(lm_mu)
+        #         d += lm_r * trace(lm_cov)
+        #     d /= (trace(cov_kpl) * self.range) #normalize
+        #     d **= 2
+        #     d *= M_sigma
 
-        #use this formulation as we have no control on "gas" only on "wheel"
-        dist = norm(np.array([est.translation() for est in ests]) - goal, axis = 1)
-        c = min(dist)**2
-
-        #currently skipping third term from equation 41, even though it rewards loop closure
-        
-        J = self.M_u*a + M_sigma*b + M_x*c
+        J = a + b + c + d
         return J
 
-    def innerLayer4alpha(self, backend : solver ,u : np.ndarray):
-        #returns covariance of X_kpL given no landmark measurements
-            for u_kpl in u:
-                backend.i += 1
-                backend.addOdomMeasurement(meas_odom(gtsam.Pose2(self.dx,0,u_kpl),self.cov_w))
-                backend.update()
-            return backend.isam2.marginalCovariance(X(backend.i))
+    def innerLayerBAR(self, backend : solver ,u : np.ndarray):
+        covs = []
+        ests = []
+
+        for u_kpl in u:
+            backend.i += 1
+            backend.addOdomMeasurement(meas_odom(gtsam.Pose2(self.dx,0,u_kpl),self.cov_w))
+            backend.update()
+
+        if u.size == 1:
+            ests = ests[0]
+            covs = covs[0]
+
+        covs.append(backend.isam2.marginalCovariance(X(backend.i))) #i == k
+        ests.append(backend.isam2.calculateEstimatePose2(X(backend.i)))
+        return ests,covs
 
     def innerLayer(self, backend : solver, u : np.ndarray):
         covs = []
@@ -153,7 +173,7 @@ class planner():
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
             for lm in lms:
                 backend.addlandmarkMeasurement(lm)
-            backend.update(2)
+            backend.update(0)
 
             covs.append(backend.isam2.marginalCovariance(X(backend.i))) #i == k
             ests.append(backend.isam2.calculateEstimatePose2(X(backend.i)))
@@ -170,8 +190,10 @@ class planner():
                 lmML = backend.isam2.calculateEstimatePoint2(L(lm_index))    
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
-                if abs(angle) < self.FOV/2 and r < self.range: #if viewed, compute noisy measurement
-                    meas.append(meas_landmark(lm_index, r, angle, self.cov_v, lm_label))
+
+                if abs(angle) < self.FOV/2 and r < self.range * 5: #if simu-viewed, compute noisy measurement
+                    cov_v_bar = self.cov_v * r/self.range
+                    meas.append(meas_landmark(lm_index, r, angle, cov_v_bar, lm_label))
             return meas
 
         #create list of landmarks
