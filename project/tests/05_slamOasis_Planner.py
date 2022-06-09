@@ -43,7 +43,7 @@ def scenario():
 
 car, worldMap, ax, fig, goals, targetRangeSwitch, dx = scenario()
 
-moviewriter = PillowWriter(fps = 15)
+moviewriter = PillowWriter(fps = 18)
 moviewriter.setup(fig,'05_movie.gif',dpi = 100)
 
 #init estimator and controller

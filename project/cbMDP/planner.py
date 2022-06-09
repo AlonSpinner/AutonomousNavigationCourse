@@ -132,9 +132,12 @@ class planner():
 
         #term d: loop closurer.
         d = 0
-        if len(backend.seen_landmarks['id']):
-            lm_mu = backend.isam2.calculateEstimatePoint2(L(backend.seen_landmarks['id'][0]))
-            lm_r = est_kpl.range(lm_mu)
+        n = len(backend.seen_landmarks['id'])
+        if n > 6: #assume first cluster has been seen
+            lm_r = 0
+            for id in backend.seen_landmarks['id'][:6]:
+                lm_mu = backend.isam2.calculateEstimatePoint2(L(id))
+                lm_r += est_kpl.range(lm_mu)/6
             d = M_sigma * (lm_r/self.range)**2
 
         J = a + b + c + d
