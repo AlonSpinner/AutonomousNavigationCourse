@@ -22,8 +22,8 @@ class planner():
         self.lambDa : float = 0.005#0.005 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
-        self.beta : float = 2.4 #[m^2]
-        self.alpha_LB  : float = 0.6 #Not stated in article
+        self.beta : float = 3.4 #[m^2]
+        self.alpha_LB  : float = 0.1 #0.6 in article
         self.alpha_km1 : float = 0.0 #keep previous alpha_k
         self.M_u = 0.1 #0.1 #weight matrix for u, page 21
         #robot simulation
@@ -47,17 +47,23 @@ class planner():
         alpha_k = min(max(trace(cov_kpL_bar),trace(cov_k))/self.beta, 1)
         #turning may reduce covariance trace due to seeing new landmarks. Sometimes in unexpected ways
         #thus, we keep alpha_k high as long as loop closure has not happend as follows:
-        if self.alpha_km1 > self.alpha_LB and alpha_k > self.alpha_LB: #self.alpha_km1 > alpha_k instead of alpha_km1 == 1
+        
+        if alpha_k < self.alpha_LB: #self.alpha_km1 > alpha_k instead of alpha_km1 == 1
+            alpha_k = alpha_k
+        else:
             alpha_k = max(self.alpha_km1,alpha_k)
+        self.alpha_km1 = alpha_k
         print(f"-------------------------------------->calculated alpha_k = {alpha_k}")
         
+        # alpha_k = logisticCurve(alpha_k, 0.5, k = 20, L = 1)
         alpha_k = float(alpha_k > 0.5) #use if/else instead of logisticCurve
         if alpha_k == 0: #and self.alpha_km1 != 0: #if loop colsure occured, u[0] should point more towards goal
             pose = backend.isam2.calculateEstimatePose2(X(k))
             u[0] = pose.bearing(goal).theta()/2
-        if alpha_k > self.alpha_LB and self.alpha_km1 <= self.alpha_LB:
+        if alpha_k > 0.9:
             pose = backend.isam2.calculateEstimatePose2(X(k))
-            u[0] = pose.bearing(np.array([0,0])).theta()/4
+            lm_mu = backend.isam2.calculateEstimatePoint2(L(backend.seen_landmarks['id'][0]))
+            u[0] = pose.bearing(np.array(lm_mu)).theta()/4
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -84,7 +90,6 @@ class planner():
                 return u, J, plannedBackend
             
             i += 1
-            self.alpha_km1 = alpha_k
             J_prev = J
 
             if self.moviewriter:
@@ -110,8 +115,7 @@ class planner():
         ests_bar,covs_bar = self.innerLayerBAR(backend.copyObject(),u) #copy backend as we need it laterz
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests_bar]) - goal, axis = 1)
-        c = min(dist/self.range)**2
-        c *= M_x
+        c = M_x * min(dist/self.range)**2
         
         #term a: control effort
         a = 0
@@ -126,14 +130,13 @@ class planner():
             b += trace(cov_kpl)/self.beta
         b *= M_sigma
 
-        #term d: loop closurer. kpl -> kpL after all iterations in term b
+        #term d: loop closurer.
         d = 0
-        n = len(backend.seen_landmarks['id'])
-        if n > 0:
+        if len(backend.seen_landmarks['id']):
             lm_mu = backend.isam2.calculateEstimatePoint2(L(backend.seen_landmarks['id'][0]))
             lm_r = est_kpl.range(lm_mu)
             d = M_sigma * (lm_r/self.range)**2
-            
+
         J = a + b + c + d
         return J, backend, np.array([a,b,c,d])
 
