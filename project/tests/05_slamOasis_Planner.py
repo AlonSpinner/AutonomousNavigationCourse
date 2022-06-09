@@ -83,7 +83,7 @@ with plt.ion():
                 break #reached last goal
 
         #Controller
-        if k < 0:
+        if k < 30:
             u_stupid = stupidController(k, backend.copyObject(), goals[targetIndex])
             odom_cmd = gtsam.Pose2(dx,0,u_stupid)
         else:

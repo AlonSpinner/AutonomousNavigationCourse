@@ -19,7 +19,7 @@ class planner():
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-10
-        self.lambDa : float = 0.001 #larger number allows for bigger turns
+        self.lambDa : float = 0.005 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
         self.beta : float = 2.4 #[m^2]
@@ -47,17 +47,17 @@ class planner():
         alpha_k = min(max(trace(cov_kpL_bar),trace(cov_k))/self.beta, 1)
         #turning may reduce covariance trace due to seeing new landmarks. Sometimes in unexpected ways
         #thus, we keep alpha_k high as long as loop closure has not happend as follows:
-        if self.alpha_km1 > alpha_k and alpha_k > self.alpha_LB: #self.alpha_km1 > alpha_k instead of alpha_km1 == 1
-            alpha_k = self.alpha_km1
+        if self.alpha_km1 > self.alpha_LB and alpha_k > self.alpha_LB: #self.alpha_km1 > alpha_k instead of alpha_km1 == 1
+            alpha_k = max(self.alpha_km1,alpha_k)
         print(f"-------------------------------------->calculated alpha_k = {alpha_k}")
         
         alpha_k = float(alpha_k > 0.5) #use if/else instead of logisticCurve
         if alpha_k == 0: #and self.alpha_km1 != 0: #if loop colsure occured, u[0] should point more towards goal
             pose = backend.isam2.calculateEstimatePose2(X(k))
             u[0] = pose.bearing(goal).theta()/2
-        if alpha_k > self.alpha_LB: #and self.alpha_km1 <= self.alpha_LB:
+        if alpha_k > self.alpha_LB and self.alpha_km1 <= self.alpha_LB:
             pose = backend.isam2.calculateEstimatePose2(X(k))
-            u[0] = pose.bearing(np.array([0,0])).theta()/2
+            u[0] = pose.bearing(np.array([0,0])).theta()
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -110,7 +110,7 @@ class planner():
         ests_bar,covs_bar = self.innerLayerBAR(backend.copyObject(),u) #copy backend as we need it laterz
         #use this formulation as we have no control on "gas" only on "wheel"
         dist = norm(np.array([est.translation() for est in ests_bar]) - goal, axis = 1)
-        c = min(dist)**2
+        c = min(dist/self.range)**2
         c *= M_x
         
         #term a: control effort
@@ -123,7 +123,7 @@ class planner():
         b = 0
         for l, u_kpl in enumerate(u):
             est_kpl,cov_kpl = self.innerLayer(backend,np.array([u_kpl]))
-            b += trace(cov_kpl)
+            b += trace(cov_kpl)/self.beta
         b *= M_sigma
 
         #term d: loop closurer. kpl -> kpL after all iterations in term b
@@ -192,7 +192,7 @@ class planner():
                 r = pose.range(lmML)
 
                 if abs(angle) < self.FOV/2 and r < self.range * 5: #if simu-viewed, compute noisy measurement
-                    cov_v_bar = self.cov_v * r/self.range
+                    cov_v_bar = self.cov_v * (r/self.range)**2
                     meas.append(meas_landmark(lm_index, r, angle, cov_v_bar, lm_label))
             return meas
 

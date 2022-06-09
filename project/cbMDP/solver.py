@@ -6,7 +6,9 @@ from .utils.datatypes import meas_odom
 from .utils.datatypes import landmark
 from .utils import plotting
 
-from copy import deepcopy, copy
+from copy import deepcopy
+import os
+import graphviz
 
 class solver:
     
@@ -223,3 +225,10 @@ class solver:
             copySolver.graphics_landmarks = deepcopy(self.graphics_landmarks)
             copySolver.graphics_poses = deepcopy(self.graphics_poses)
         return copySolver
+
+    def saveGraph(self,filename):
+        self.graph.saveGraph(filename) #temp file
+        graphviz.render('dot','pdf',filename) #creates PDF
+        os.remove(filename) #delete temp file
+
+
