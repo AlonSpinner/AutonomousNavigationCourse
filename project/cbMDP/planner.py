@@ -19,7 +19,7 @@ class planner():
         self.epsConvGrad : float = 1e-5
         self.epsConvVal : float = 1e-4
         self.epsGrad : float = 1e-10
-        self.lambDa : float = 0.005 #larger number allows for bigger turns
+        self.lambDa : float = 0.005#0.005 #larger number allows for bigger turns
         self.i_max : int = 10 #maximum number of iterations for graident decent
         #weighting
         self.beta : float = 2.4 #[m^2]
@@ -57,7 +57,7 @@ class planner():
             u[0] = pose.bearing(goal).theta()/2
         if alpha_k > self.alpha_LB and self.alpha_km1 <= self.alpha_LB:
             pose = backend.isam2.calculateEstimatePose2(X(k))
-            u[0] = pose.bearing(np.array([0,0])).theta()
+            u[0] = pose.bearing(np.array([0,0])).theta()/4
 
         M_x = 1-alpha_k
         M_sigma = alpha_k
@@ -70,7 +70,7 @@ class planner():
 
             #check convergence
             plannedBackend = backend.copyObject()
-            J = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
+            J,_ ,_ = self.evaluateObjective(plannedBackend, u, M_x, M_sigma, goal)
             print(f"J = {J};    norm(dJ) = {norm(dJ)};    (J-J_prev)/J_prev = {norm((J-J_prev)/(J_prev + 1e-10))}")
             
             if norm(dJ) < self.epsConvGrad:
@@ -99,8 +99,8 @@ class planner():
         for i in range(u.size):
             du = np.zeros_like(u)
             du[i] = self.epsGrad
-            Jpi = self.evaluateObjective(backend.copyObject(),u + du ,M_x, M_sigma, goal)
-            Jmi = self.evaluateObjective(backend.copyObject(),u - du ,M_x, M_sigma, goal)
+            Jpi, backend_left, partialCost_left = self.evaluateObjective(backend.copyObject(),u + du ,M_x, M_sigma, goal) #turn left
+            Jmi, backend_right, partialCost_right = self.evaluateObjective(backend.copyObject(),u - du ,M_x, M_sigma, goal) #turn right
             dJ[i] = (Jpi-Jmi)/(2 * self.epsGrad)
         return dJ
 
@@ -122,25 +122,34 @@ class planner():
         #term b: poses covariance
         b = 0
         for l, u_kpl in enumerate(u):
-            est_kpl,cov_kpl = self.innerLayer(backend,np.array([u_kpl]))
+            est_kpl, cov_kpl, lms_kpl = self.innerLayer(backend,np.array([u_kpl]))
             b += trace(cov_kpl)/self.beta
         b *= M_sigma
 
         #term d: loop closurer. kpl -> kpL after all iterations in term b
-        d = 0
-        # n = len(backend.seen_landmarks["id"])
-        # if n > 0:
-        #     for lm_index in backend.seen_landmarks["id"]:
-        #         lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
-        #         lm_cov = backend.isam2.marginalCovariance(L(lm_index))
-        #         lm_r = est_kpl.range(lm_mu)
-        #         d += lm_r * trace(lm_cov)
-        #     d /= (trace(cov_kpl) * self.range) #normalize
-        #     d **= 2
-        #     d *= M_sigma
+        ds = []
+        n = len(backend.seen_landmarks['id'])
+        last_lm_id = backend.seen_landmarks['id'][-1]
+        if n > 0:
+            tr_cov_L0 = trace(backend.isam2.marginalCovariance(L(0)))
+            tr_cov_Ln = trace(backend.isam2.marginalCovariance(L(last_lm_id)))
+            tr = (tr_cov_L0+tr_cov_Ln)/2
+            for lm_index in backend.seen_landmarks['id']:#[lm.id for lm in lms_kpl]:
+                lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
+                tr_lm_cov = trace(backend.isam2.marginalCovariance(L(lm_index)))
+                lm_r = est_kpl.range(lm_mu)
+                if tr_lm_cov > tr:
+                    ds.append((tr_lm_cov/tr) / (lm_r/self.range)) #get away from large covs
+                else:
+                    ds.append((tr_lm_cov/tr) * (lm_r/self.range)) #get closer to small covs
+
+            d = np.sum(np.array(ds))
+            d /= (5) ##normalize
+            d **= 2
+            d *= M_sigma
 
         J = a + b + c + d
-        return J
+        return J, backend, np.array([a,b,c,d])
 
     def innerLayerBAR(self, backend : solver ,u : np.ndarray):
         covs = []
@@ -167,7 +176,7 @@ class planner():
             backend.i += 1
 
             backend.addOdomMeasurement(meas_odom(gtsam.Pose2(self.dx,0,u_kpl),self.cov_w))
-            backend.update() #need to update to pull X_kpl for landmark measurements
+            backend.update(0) #need to update to pull X_kpl for landmark measurements
 
             X_kpl = backend.isam2.calculateEstimatePose2(X(backend.i))
             lms =  self.simulateMeasuringLandmarks(backend, X_kpl) #need to write this down
@@ -182,7 +191,7 @@ class planner():
             ests = ests[0]
             covs = covs[0]
 
-        return ests,covs
+        return ests, covs, lms
 
     def simulateMeasuringLandmarks(self, backend : solver, pose : gtsam.Pose2):
             meas = []
@@ -191,8 +200,8 @@ class planner():
                 angle = pose.bearing(lmML).theta()
                 r = pose.range(lmML)
 
-                if abs(angle) < self.FOV/2 and r < self.range * 5: #if simu-viewed, compute noisy measurement
-                    cov_v_bar = self.cov_v * (r/self.range)**2
+                if abs(angle) < self.FOV/2 and r < self.range*5: #if simu-viewed, compute noisy measurement
+                    cov_v_bar = self.cov_v * max((r/self.range)**2,1)
                     meas.append(meas_landmark(lm_index, r, angle, cov_v_bar, lm_label))
             return meas
 
