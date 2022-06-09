@@ -127,27 +127,13 @@ class planner():
         b *= M_sigma
 
         #term d: loop closurer. kpl -> kpL after all iterations in term b
-        ds = []
+        d = 0
         n = len(backend.seen_landmarks['id'])
-        last_lm_id = backend.seen_landmarks['id'][-1]
         if n > 0:
-            tr_cov_L0 = trace(backend.isam2.marginalCovariance(L(0)))
-            tr_cov_Ln = trace(backend.isam2.marginalCovariance(L(last_lm_id)))
-            tr = (tr_cov_L0+tr_cov_Ln)/2
-            for lm_index in backend.seen_landmarks['id']:#[lm.id for lm in lms_kpl]:
-                lm_mu = backend.isam2.calculateEstimatePoint2(L(lm_index))
-                tr_lm_cov = trace(backend.isam2.marginalCovariance(L(lm_index)))
-                lm_r = est_kpl.range(lm_mu)
-                if tr_lm_cov > tr:
-                    ds.append((tr_lm_cov/tr) / (lm_r/self.range)) #get away from large covs
-                else:
-                    ds.append((tr_lm_cov/tr) * (lm_r/self.range)) #get closer to small covs
-
-            d = np.sum(np.array(ds))
-            d /= (5) ##normalize
-            d **= 2
-            d *= M_sigma
-
+            lm_mu = backend.isam2.calculateEstimatePoint2(L(backend.seen_landmarks['id'][0]))
+            lm_r = est_kpl.range(lm_mu)
+            d = M_sigma * (lm_r/self.range)**2
+            
         J = a + b + c + d
         return J, backend, np.array([a,b,c,d])
 
